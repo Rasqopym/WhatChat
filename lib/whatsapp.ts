@@ -5,7 +5,7 @@
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 
-import { activeSettings } from '@/app/api/settings/route';
+import { activeSettings } from '@/lib/settings-store';
 
 export async function sendWhatsAppTextMessage(to: string, message: string) {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
