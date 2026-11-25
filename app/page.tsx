@@ -362,21 +362,33 @@ export default function WhatsAppMultiAgentApp() {
     return `• Customer Intent: ${selectedConv.last_message_text}\n• Status: In discussion with ${currentAgent.name}\n• Action Required: Follow up within 1 business day.`;
   };
 
-  // 4. Assign Conversation
-  const handleAssignAgent = (agentId: string | null) => {
+  // 4. Assign Conversation (Synced to Supabase)
+  const handleAssignAgent = async (agentId: string | null) => {
     if (!selectedConv) return;
+    const convId = selectedConv.id;
     setConversations((prev) =>
-      prev.map((c) => (c.id === selectedConv.id ? { ...c, assigned_agent_id: agentId } : c))
+      prev.map((c) => (c.id === convId ? { ...c, assigned_agent_id: agentId } : c))
     );
+
+    try {
+      await fetch('/api/conversations/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: convId, assignedAgentId: agentId }),
+      });
+    } catch (e) {
+      console.warn('Failed to persist assignment:', e);
+    }
   };
 
-  // 5. Add Internal Team Note
+  // 5. Add Internal Team Note (Synced to Supabase)
   const handleAddNote = async (content: string) => {
     if (!selectedConv) return;
+    const convId = selectedConv.id;
 
     const newNote: InternalNote = {
       id: `n-${Date.now()}`,
-      conversation_id: selectedConv.id,
+      conversation_id: convId,
       agent_id: currentAgent.id,
       agent_name: currentAgent.name,
       content,
@@ -385,16 +397,45 @@ export default function WhatsAppMultiAgentApp() {
 
     setNotesMap((prev) => ({
       ...prev,
-      [selectedConv.id]: [newNote, ...(prev[selectedConv.id] || [])],
+      [convId]: [newNote, ...(prev[convId] || [])],
     }));
+
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: convId,
+          agentId: currentAgent.id,
+          agentName: currentAgent.name,
+          content,
+        }),
+      });
+      if (res.ok) {
+        await syncLiveInbox();
+      }
+    } catch (e) {
+      console.warn('Failed to persist internal note:', e);
+    }
   };
 
-  // 6. Change Status
-  const handleStatusChange = (status: 'open' | 'pending' | 'closed') => {
+  // 6. Change Status (Synced to Supabase)
+  const handleStatusChange = async (status: 'open' | 'pending' | 'closed') => {
     if (!selectedConv) return;
+    const convId = selectedConv.id;
     setConversations((prev) =>
-      prev.map((c) => (c.id === selectedConv.id ? { ...c, status } : c))
+      prev.map((c) => (c.id === convId ? { ...c, status } : c))
     );
+
+    try {
+      await fetch('/api/conversations/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: convId, status }),
+      });
+    } catch (e) {
+      console.warn('Failed to persist status:', e);
+    }
   };
 
   // 7. Update Customer Labels / Tags
@@ -463,9 +504,16 @@ export default function WhatsAppMultiAgentApp() {
               onSelect={(conv) => {
                 setSelectedId(conv.id);
                 setMobileShowChat(true);
-                setConversations((prev) =>
-                  prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
-                );
+                if (conv.unread_count > 0) {
+                  setConversations((prev) =>
+                    prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
+                  );
+                  fetch('/api/conversations/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversationId: conv.id, unreadCount: 0 }),
+                  }).catch(() => {});
+                }
               }}
             />
           </div>

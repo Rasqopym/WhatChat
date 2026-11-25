@@ -51,9 +51,14 @@ export async function GET() {
       // Ignore if businesses table doesn't exist yet
     }
 
+    const normalizedConversations = (conversations || []).map((c: any) => ({
+      ...c,
+      assigned_agent_id: c.assigned_agent_id || c.assigned_agent_key || null,
+    }));
+
     return NextResponse.json(
       {
-        conversations: conversations || [],
+        conversations: normalizedConversations,
         messages: messages || [],
         notes: notes || [],
         businesses,
