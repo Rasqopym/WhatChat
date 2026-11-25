@@ -129,6 +129,60 @@ export async function sendWhatsAppMediaMessage(params: {
   return { success: true, messageId: msgData.messages?.[0]?.id };
 }
 
+export async function sendWhatsAppTemplateMessage(params: {
+  to: string;
+  templateName: string;
+  languageCode?: string;
+  bodyParams?: string[];
+  overridePhoneNumberId?: string | null;
+  overrideAccessToken?: string | null;
+}) {
+  const phoneNumberId = params.overridePhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
+  const accessToken = params.overrideAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
+
+  if (!phoneNumberId || !accessToken) {
+    console.warn('[WhatsApp Template API] Credentials not configured. Skipping external send.');
+    return { success: true, simulated: true };
+  }
+
+  const formattedTo = params.to.replace(/\+/g, '').replace(/\s+/g, '');
+  const templateObj: Record<string, any> = {
+    name: params.templateName,
+    language: { code: params.languageCode || 'en_US' },
+  };
+
+  if (params.bodyParams && params.bodyParams.length > 0) {
+    templateObj.components = [
+      {
+        type: 'body',
+        parameters: params.bodyParams.map((text) => ({ type: 'text', text })),
+      },
+    ];
+  }
+
+  const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: formattedTo,
+      type: 'template',
+      template: templateObj,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    console.error('[WhatsApp Template Error]', data);
+    throw new Error(data.error?.message || 'Failed to send WhatsApp template message');
+  }
+
+  return { success: true, messageId: data.messages?.[0]?.id };
+}
+
 export async function markWhatsAppMessageAsRead(messageId: string) {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;

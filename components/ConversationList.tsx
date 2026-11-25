@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Conversation, Agent, Business } from '@/types';
-import { Search, UserCheck, AlertCircle, Inbox, Building2 } from 'lucide-react';
+import { Search, UserCheck, AlertCircle, Inbox, Building2, MessageSquarePlus } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -13,6 +13,7 @@ interface ConversationListProps {
   selectedBusinessId: string;
   onSelectBusiness: (businessId: string) => void;
   onSelect: (conv: Conversation) => void;
+  onNewChatClick?: () => void;
 }
 
 type FilterTab = 'all' | 'mine' | 'unassigned' | 'urgent';
@@ -26,6 +27,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   selectedBusinessId,
   onSelectBusiness,
   onSelect,
+  onNewChatClick,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,6 +101,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               ))}
             </select>
           </div>
+
+          {onNewChatClick && (
+            <button
+              onClick={onNewChatClick}
+              className="px-2.5 py-1.5 bg-[#128C7E] hover:bg-[#075E54] text-white text-xs font-bold rounded-xl flex items-center space-x-1 shadow-sm flex-shrink-0 cursor-pointer transition-colors"
+              title="Start New WhatsApp Chat"
+            >
+              <MessageSquarePlus className="w-4 h-4" />
+              <span>New</span>
+            </button>
+          )}
         </div>
 
         {/* Search Input */}

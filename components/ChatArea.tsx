@@ -21,7 +21,8 @@ import {
   Download,
   X,
   ArrowLeft,
-  Info
+  Info,
+  LayoutTemplate
 } from 'lucide-react';
 
 interface ChatAreaProps {
@@ -38,6 +39,7 @@ interface ChatAreaProps {
   onStatusChange: (status: 'open' | 'pending' | 'closed') => void;
   onBackMobile?: () => void;
   onOpenDetailsMobile?: () => void;
+  onOpenTemplateClick?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -51,6 +53,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onStatusChange,
   onBackMobile,
   onOpenDetailsMobile,
+  onOpenTemplateClick,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -592,12 +595,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 transition-colors"
-                title="Attach Photo or Document"
+                className="text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 transition-colors cursor-pointer"
+                title="Attach Photo, Video, or Document"
               >
                 <Paperclip className="w-3.5 h-3.5 text-slate-600" />
                 <span>Attach</span>
               </button>
+
+              {/* WhatsApp Approved Template Button */}
+              {onOpenTemplateClick && (
+                <button
+                  type="button"
+                  onClick={onOpenTemplateClick}
+                  className="text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 transition-colors cursor-pointer"
+                  title="Send Approved WhatsApp Template (Works after 24h)"
+                >
+                  <LayoutTemplate className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline">Template</span>
+                </button>
+              )}
             </div>
 
             {/* AI Draft Button */}

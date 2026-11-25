@@ -8,6 +8,7 @@ import { RightPanel } from '@/components/RightPanel';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { AdminSettings } from '@/components/AdminSettings';
 import { LoginPage } from '@/components/LoginPage';
+import { TemplateModal } from '@/components/TemplateModal';
 import {
   MOCK_AGENTS,
   MOCK_BUSINESSES,
@@ -51,6 +52,7 @@ export default function WhatsAppMultiAgentApp() {
   const [activeView, setActiveView] = useState<ActiveView>('inbox');
   const [mobileShowChat, setMobileShowChat] = useState<boolean>(false);
   const [mobileShowDetails, setMobileShowDetails] = useState<boolean>(false);
+  const [templateModalMode, setTemplateModalMode] = useState<'new_chat' | 'reply_template' | null>(null);
 
   // Push Notification State
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
@@ -501,6 +503,7 @@ export default function WhatsAppMultiAgentApp() {
               businesses={businesses}
               selectedBusinessId={selectedBusinessId}
               onSelectBusiness={setSelectedBusinessId}
+              onNewChatClick={() => setTemplateModalMode('new_chat')}
               onSelect={(conv) => {
                 setSelectedId(conv.id);
                 setMobileShowChat(true);
@@ -531,6 +534,7 @@ export default function WhatsAppMultiAgentApp() {
               onStatusChange={handleStatusChange}
               onBackMobile={() => setMobileShowChat(false)}
               onOpenDetailsMobile={() => setMobileShowDetails(true)}
+              onOpenTemplateClick={() => setTemplateModalMode('reply_template')}
             />
           </div>
 
@@ -594,6 +598,27 @@ export default function WhatsAppMultiAgentApp() {
           onUpdateAgents={setAgents}
           onUpdateBusinesses={setBusinesses}
           onSwitchAgent={(agent) => setCurrentAgent(agent)}
+        />
+      )}
+
+      {/* WhatsApp Approved Template & New Chat Modal */}
+      {templateModalMode && (
+        <TemplateModal
+          mode={templateModalMode}
+          conversationId={selectedConv?.id}
+          customerLabel={selectedConv?.contact?.name || selectedConv?.contact?.phone_number}
+          businesses={businesses}
+          defaultBusinessId={selectedBusinessId}
+          currentAgent={currentAgent}
+          onClose={() => setTemplateModalMode(null)}
+          onSent={async (newConvId) => {
+            await syncLiveInbox();
+            if (newConvId) {
+              setSelectedId(newConvId);
+              setActiveView('inbox');
+              setMobileShowChat(true);
+            }
+          }}
         />
       )}
     </div>
