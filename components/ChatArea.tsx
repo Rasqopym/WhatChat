@@ -30,7 +30,10 @@ interface ChatAreaProps {
   messages: Message[];
   currentAgent: Agent;
   cannedResponses: CannedResponse[];
-  onSendMessage: (text: string, media?: { type: MessageMediaType; url: string; name?: string; duration?: number }) => Promise<void>;
+  onSendMessage: (
+    text: string,
+    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string }
+  ) => Promise<void>;
   onDraftWithAI: () => Promise<string>;
   onStatusChange: (status: 'open' | 'pending' | 'closed') => void;
   onBackMobile?: () => void;
@@ -105,6 +108,50 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   }
 
+  // Helper to convert File to base64 + convert WebP/unsupported images to JPEG for WhatsApp API
+  const prepareFileForWhatsApp = (file: File, type: MessageMediaType): Promise<{ base64: string; mimeType: string; dataUrl: string; filename: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const rawDataUrl = reader.result as string;
+        if (type === 'image' && file.type !== 'image/jpeg' && file.type !== 'image/png') {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0);
+              const jpegUrl = canvas.toDataURL('image/jpeg', 0.88);
+              resolve({
+                base64: jpegUrl.split(',')[1],
+                mimeType: 'image/jpeg',
+                dataUrl: jpegUrl,
+                filename: file.name.replace(/\.[^/.]+$/, '.jpg'),
+              });
+              return;
+            }
+            resolve({ base64: rawDataUrl.split(',')[1], mimeType: file.type, dataUrl: rawDataUrl, filename: file.name });
+          };
+          img.onerror = () => resolve({ base64: rawDataUrl.split(',')[1], mimeType: file.type, dataUrl: rawDataUrl, filename: file.name });
+          img.src = rawDataUrl;
+        } else {
+          resolve({
+            base64: rawDataUrl.split(',')[1],
+            mimeType: file.type || 'application/octet-stream',
+            dataUrl: rawDataUrl,
+            filename: file.name,
+          });
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle Text/Media Submit
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -113,10 +160,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setIsSending(true);
     try {
       if (pendingFile) {
-        await onSendMessage(inputText.trim() || pendingFile.file.name, {
+        const prepared = await prepareFileForWhatsApp(pendingFile.file, pendingFile.type);
+        await onSendMessage(inputText.trim(), {
           type: pendingFile.type,
-          url: pendingFile.previewUrl,
-          name: pendingFile.file.name,
+          url: prepared.dataUrl,
+          name: prepared.filename,
+          base64: prepared.base64,
+          mimeType: prepared.mimeType,
         });
         setPendingFile(null);
       } else {

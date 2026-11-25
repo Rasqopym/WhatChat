@@ -249,7 +249,7 @@ export default function WhatsAppMultiAgentApp() {
   // 1. Send Message (with Text, Image, Voice, or Document)
   const handleSendMessage = async (
     text: string,
-    media?: { type: MessageMediaType; url: string; name?: string; duration?: number }
+    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string }
   ) => {
     if (!selectedConv) return;
 

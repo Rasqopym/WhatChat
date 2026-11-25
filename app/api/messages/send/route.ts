@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { sendWhatsAppTextMessage } from '@/lib/whatsapp';
+import { sendWhatsAppTextMessage, sendWhatsAppMediaMessage } from '@/lib/whatsapp';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,12 +50,26 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Dispatch to Meta WhatsApp API using business-specific or default credentials
-    const sendResult = await sendWhatsAppTextMessage(
-      recipientPhone,
-      text || media?.name || 'Attachment',
-      bizPhoneId,
-      bizToken
-    );
+    let sendResult;
+    if (media?.base64 && media?.mimeType && (media.type === 'image' || media.type === 'document' || media.type === 'audio')) {
+      sendResult = await sendWhatsAppMediaMessage({
+        to: recipientPhone,
+        base64Data: media.base64,
+        mimeType: media.mimeType,
+        mediaType: media.type,
+        caption: text || undefined,
+        filename: media.name,
+        overridePhoneNumberId: bizPhoneId,
+        overrideAccessToken: bizToken,
+      });
+    } else {
+      sendResult = await sendWhatsAppTextMessage(
+        recipientPhone,
+        text || media?.name || 'Attachment',
+        bizPhoneId,
+        bizToken
+      );
+    }
 
     // 3. Record in messages table (only valid schema columns; sender_id only if valid UUID)
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
