@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
       if (!conversation) {
         // Triage message using AI to determine priority and initial category
-        let triage = { priority: 'normal' as const, tags: ['Support'] };
+        let triage: { priority: 'normal' | 'urgent'; tags: string[] } = { priority: 'normal', tags: ['Support'] };
         try {
           if (messageText) triage = await triageMessage(messageText);
         } catch (e) {
