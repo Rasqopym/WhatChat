@@ -204,18 +204,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Handle File Selection
+  // Handle File Selection (Images, Videos, Audio, Documents)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isImage = file.type.startsWith('image/');
     const previewUrl = URL.createObjectURL(file);
+    let mediaType: MessageMediaType = 'document';
+    if (file.type.startsWith('image/')) mediaType = 'image';
+    else if (file.type.startsWith('video/')) mediaType = 'video';
+    else if (file.type.startsWith('audio/')) mediaType = 'audio';
 
     setPendingFile({
       file,
       previewUrl,
-      type: isImage ? 'image' : 'document',
+      type: mediaType,
     });
 
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -360,6 +363,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       src={msg.media_url}
                       alt="Attachment"
                       className="max-h-60 w-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Media: Video Attachment */}
+                {msg.media_type === 'video' && msg.media_url && (
+                  <div className="mb-2 rounded-lg overflow-hidden border border-black/10 bg-black">
+                    <video
+                      src={msg.media_url}
+                      controls
+                      className="max-h-60 w-full"
                     />
                   </div>
                 )}
@@ -536,7 +550,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 ref={fileInputRef}
                 type="file"
                 onChange={handleFileChange}
-                accept="image/*,.pdf,.doc,.docx"
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                 className="hidden"
               />
 

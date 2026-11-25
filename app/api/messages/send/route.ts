@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Dispatch to Meta WhatsApp API using business-specific or default credentials
     let sendResult;
-    if (media?.base64 && media?.mimeType && (media.type === 'image' || media.type === 'document' || media.type === 'audio')) {
+    if (media?.base64 && media?.mimeType && (media.type === 'image' || media.type === 'document' || media.type === 'audio' || media.type === 'video')) {
       sendResult = await sendWhatsAppMediaMessage({
         to: recipientPhone,
         base64Data: media.base64,
@@ -99,6 +99,8 @@ export async function POST(req: NextRequest) {
       ? '🎤 Voice message' 
       : media?.type === 'image' 
       ? '📷 Photo' 
+      : media?.type === 'video'
+      ? '🎥 Video'
       : media?.type === 'document' 
       ? `📄 ${media.name}` 
       : text;

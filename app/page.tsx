@@ -279,7 +279,7 @@ export default function WhatsAppMultiAgentApp() {
         c.id === selectedConv.id
           ? {
               ...c,
-              last_message_text: media?.type === 'audio' ? '🎤 Voice message' : media?.type === 'image' ? '📷 Photo' : media?.type === 'document' ? `📄 ${media.name}` : text,
+              last_message_text: media?.type === 'audio' ? '🎤 Voice message' : media?.type === 'image' ? '📷 Photo' : media?.type === 'video' ? '🎥 Video' : media?.type === 'document' ? `📄 ${media.name}` : text,
               last_message_at: new Date().toISOString(),
               unread_count: 0,
             }

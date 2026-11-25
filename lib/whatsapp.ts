@@ -53,7 +53,7 @@ export async function sendWhatsAppMediaMessage(params: {
   to: string;
   base64Data: string;
   mimeType: string;
-  mediaType: 'image' | 'document' | 'audio';
+  mediaType: 'image' | 'document' | 'audio' | 'video';
   caption?: string;
   filename?: string;
   overridePhoneNumberId?: string | null;
@@ -101,6 +101,9 @@ export async function sendWhatsAppMediaMessage(params: {
   if (params.mediaType === 'image') {
     payload.image = { id: uploadData.id };
     if (params.caption) payload.image.caption = params.caption;
+  } else if (params.mediaType === 'video') {
+    payload.video = { id: uploadData.id };
+    if (params.caption) payload.video.caption = params.caption;
   } else if (params.mediaType === 'document') {
     payload.document = { id: uploadData.id, filename: params.filename || 'document' };
     if (params.caption) payload.document.caption = params.caption;

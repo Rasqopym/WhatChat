@@ -56,7 +56,7 @@ export interface Conversation {
 
 export type SenderType = 'customer' | 'agent' | 'bot';
 export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read';
-export type MessageMediaType = 'text' | 'image' | 'audio' | 'document';
+export type MessageMediaType = 'text' | 'image' | 'audio' | 'document' | 'video';
 
 export interface Message {
   id: string;
