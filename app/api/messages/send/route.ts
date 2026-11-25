@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { sendWhatsAppTextMessage } from '@/lib/whatsapp';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   try {
-    const { conversationId, text, agentId, agentName, media } = await req.json();
+    const { conversationId, text, agentId, media } = await req.json();
 
     if (!conversationId || (!text && !media)) {
       return NextResponse.json({ error: 'Missing conversationId or text/media' }, { status: 400 });
@@ -31,18 +33,18 @@ export async function POST(req: NextRequest) {
     // 2. Dispatch to Meta WhatsApp API
     const sendResult = await sendWhatsAppTextMessage(recipientPhone, text || media?.name || 'Attachment');
 
-    // 3. Record in messages table
+    // 3. Record in messages table (only valid schema columns; sender_id only if valid UUID)
+    const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
+
     const { data: message, error: msgError } = await supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
         sender_type: 'agent',
-        sender_id: agentId || null,
+        sender_id: validSenderId,
         text: text,
-        media_type: media?.type,
-        media_url: media?.url,
-        media_name: media?.name,
-        audio_duration: media?.duration,
+        media_type: media?.type || null,
+        media_url: media?.url || null,
         status: sendResult.simulated ? 'delivered' : 'sent',
         whatsapp_message_id: sendResult.messageId || null,
       })
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
 
     if (msgError) {
       console.error('Failed to record sent message:', msgError);
+      return NextResponse.json({ error: msgError.message }, { status: 500 });
     }
 
     // 4. Update conversation: clear unread count, set last message
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', conversationId);
 
-    return NextResponse.json({ success: true, message });
+    return NextResponse.json({ success: true, simulated: sendResult.simulated, message });
   } catch (error: any) {
     console.error('[Send Message Error]', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

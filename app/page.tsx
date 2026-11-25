@@ -184,7 +184,7 @@ export default function WhatsAppMultiAgentApp() {
 
     // Dispatch to API
     try {
-      await fetch('/api/messages/send', {
+      const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,8 +195,16 @@ export default function WhatsAppMultiAgentApp() {
           media,
         }),
       });
-    } catch (e) {
-      console.warn('API send failed, retained in local state:', e);
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`Failed to send WhatsApp message: ${result.error || 'Unknown error'}`);
+      } else {
+        // Sync immediately so the DB-saved message replaces the temp one cleanly
+        await syncLiveInbox();
+      }
+    } catch (e: any) {
+      console.warn('API send failed:', e);
+      alert(`Network error sending message: ${e.message}`);
     }
   };
 
