@@ -33,15 +33,18 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Verify it is a WhatsApp event
-    if (body.object !== 'whatsapp_business_account') {
+    const supabase = getServiceSupabase();
+
+    // Support both Meta Production format (entry[0].changes[0].value)
+    // and Meta Dashboard "Test" button format (field: "messages", value: {...})
+    let value = null;
+    if (body.object === 'whatsapp_business_account') {
+      value = body.entry?.[0]?.changes?.[0]?.value;
+    } else if (body.field === 'messages' && body.value) {
+      value = body.value;
+    } else {
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
-
-    const supabase = getServiceSupabase();
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
 
     // Handle delivery/read status updates
     if (value?.statuses && value.statuses.length > 0) {
