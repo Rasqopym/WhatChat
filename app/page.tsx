@@ -67,28 +67,75 @@ export default function WhatsAppMultiAgentApp() {
   const currentNotes = selectedId ? notesMap[selectedId] || [] : [];
   const totalUnreadCount = conversations.reduce((acc, c) => acc + c.unread_count, 0);
 
-  // Real-time Supabase subscription if configured
+  // Fetch live conversations & messages from Supabase via /api/inbox
+  const syncLiveInbox = async () => {
+    try {
+      const res = await fetch('/api/inbox', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.conversations && data.conversations.length > 0) {
+        // Group messages by conversation_id
+        const liveMsgMap: Record<string, Message[]> = { ...MOCK_MESSAGES };
+        (data.messages || []).forEach((m: Message) => {
+          if (!liveMsgMap[m.conversation_id]) {
+            liveMsgMap[m.conversation_id] = [];
+          }
+          // Avoid duplicates
+          if (!liveMsgMap[m.conversation_id].some((existing) => existing.id === m.id)) {
+            liveMsgMap[m.conversation_id].push(m);
+          }
+        });
+
+        // Group notes by conversation_id
+        const liveNotesMap: Record<string, InternalNote[]> = { ...MOCK_NOTES };
+        (data.notes || []).forEach((n: InternalNote) => {
+          if (!liveNotesMap[n.conversation_id]) {
+            liveNotesMap[n.conversation_id] = [];
+          }
+          if (!liveNotesMap[n.conversation_id].some((existing) => existing.id === n.id)) {
+            liveNotesMap[n.conversation_id].push(n);
+          }
+        });
+
+        // Merge live conversations at the top, followed by mock conversations
+        setConversations((prev) => {
+          const liveIds = new Set(data.conversations.map((c: Conversation) => c.id));
+          const remainingMocks = MOCK_CONVERSATIONS.filter((m) => !liveIds.has(m.id));
+          return [...data.conversations, ...remainingMocks];
+        });
+        setMessagesMap(liveMsgMap);
+        setNotesMap(liveNotesMap);
+      }
+    } catch (err) {
+      console.warn('Live inbox sync error:', err);
+    }
+  };
+
+  // Poll /api/inbox every 3 seconds + Supabase Realtime subscription
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) return;
+    syncLiveInbox();
+    const pollInterval = setInterval(syncLiveInbox, 3000);
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
+      return () => clearInterval(pollInterval);
+    }
 
     const channel = supabase
       .channel('whatsapp-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        const newMsg = payload.new as Message;
-        setMessagesMap((prev) => ({
-          ...prev,
-          [newMsg.conversation_id]: [...(prev[newMsg.conversation_id] || []), newMsg],
-        }));
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        syncLiveInbox();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
-        const updatedConv = payload.new as Conversation;
-        setConversations((prev) =>
-          prev.map((c) => (c.id === updatedConv.id ? { ...c, ...updatedConv } : c))
-        );
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => {
+        syncLiveInbox();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
+        syncLiveInbox();
       })
       .subscribe();
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, []);

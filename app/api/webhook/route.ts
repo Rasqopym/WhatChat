@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { markWhatsAppMessageAsRead } from '@/lib/whatsapp';
 import { triageMessage } from '@/lib/ai';
+import { activeSettings } from '@/lib/settings-store';
 
 /**
  * 1. GET /api/webhook
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || activeSettings.verifyToken;
 
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('[Webhook] Verification successful');
