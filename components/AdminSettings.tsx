@@ -18,7 +18,8 @@ import {
   Loader2,
   CheckCircle2,
   Building2,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 
 interface AdminSettingsProps {
@@ -67,8 +68,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newAgentRole, setNewAgentRole] = useState<'admin' | 'agent'>('agent');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // New Business Modal Form
+  // Add / Edit Business Modal Form
   const [showBizModal, setShowBizModal] = useState(false);
+  const [editingBizId, setEditingBizId] = useState<string | null>(null);
   const [newBizName, setNewBizName] = useState('');
   const [newBizPhone, setNewBizPhone] = useState('');
   const [newBizPhoneId, setNewBizPhoneId] = useState('');
@@ -76,11 +78,34 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newBizColor, setNewBizColor] = useState('#128C7E');
   const [newBizContext, setNewBizContext] = useState('');
 
-  const handleAddBusiness = async (e: React.FormEvent) => {
+  const openAddBizModal = () => {
+    setEditingBizId(null);
+    setNewBizName('');
+    setNewBizPhone('');
+    setNewBizPhoneId('');
+    setNewBizToken('');
+    setNewBizColor('#128C7E');
+    setNewBizContext('');
+    setShowBizModal(true);
+  };
+
+  const openEditBizModal = (biz: Business) => {
+    setEditingBizId(biz.id);
+    setNewBizName(biz.name);
+    setNewBizPhone(biz.display_phone_number || '');
+    setNewBizPhoneId(biz.whatsapp_phone_number_id);
+    setNewBizToken('');
+    setNewBizColor(biz.brand_color || '#128C7E');
+    setNewBizContext(biz.ai_context || '');
+    setShowBizModal(true);
+  };
+
+  const handleSaveBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin || !newBizName.trim() || !newBizPhoneId.trim()) return;
 
     const payload = {
+      id: editingBizId || undefined,
       name: newBizName.trim(),
       display_phone_number: newBizPhone.trim(),
       whatsapp_phone_number_id: newBizPhoneId.trim(),
@@ -89,23 +114,40 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       ai_context: newBizContext.trim(),
     };
 
-    try {
-      const res = await fetch('/api/businesses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (res.ok && data.business) {
-        onUpdateBusinesses([...businesses, data.business]);
-      } else {
-        // Fallback local state if DB migration hasn't run yet
+    if (editingBizId) {
+      // Update existing business
+      try {
+        const res = await fetch('/api/businesses', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        const updatedBiz = res.ok && data.business ? data.business : { ...payload, id: editingBizId };
+        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...updatedBiz } : b)));
+      } catch {
+        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload } : b)));
+      }
+    } else {
+      // Create new business
+      try {
+        const res = await fetch('/api/businesses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok && data.business) {
+          onUpdateBusinesses([...businesses, data.business]);
+        } else {
+          onUpdateBusinesses([...businesses, { id: `biz-${Date.now()}`, ...payload }]);
+        }
+      } catch {
         onUpdateBusinesses([...businesses, { id: `biz-${Date.now()}`, ...payload }]);
       }
-    } catch {
-      onUpdateBusinesses([...businesses, { id: `biz-${Date.now()}`, ...payload }]);
     }
 
+    setEditingBizId(null);
     setNewBizName('');
     setNewBizPhone('');
     setNewBizPhoneId('');
@@ -284,7 +326,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
             <button
               type="button"
-              onClick={() => setShowBizModal(true)}
+              onClick={openAddBizModal}
               className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -303,14 +345,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     >
                       ● {biz.name}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteBusiness(biz.id)}
-                      className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
-                      title="Remove Business"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => openEditBizModal(biz)}
+                        className="text-slate-400 hover:text-indigo-600 p-1 cursor-pointer"
+                        title="Edit Business"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBusiness(biz.id)}
+                        className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
+                        title="Remove Business"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-xs font-mono text-slate-700 mt-2">{biz.display_phone_number || 'No display number'}</div>
                   <div className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {biz.whatsapp_phone_number_id}</div>
@@ -637,10 +689,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-indigo-600" />
-              <span>Add New Business WhatsApp Line</span>
+              <span>{editingBizId ? 'Edit Business WhatsApp Line' : 'Add New Business WhatsApp Line'}</span>
             </h3>
 
-            <form onSubmit={handleAddBusiness} className="space-y-3">
+            <form onSubmit={handleSaveBusiness} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1">Business / Brand Name *</label>
                 <input
