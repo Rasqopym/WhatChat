@@ -7,9 +7,14 @@ const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 
 import { activeSettings } from '@/lib/settings-store';
 
-export async function sendWhatsAppTextMessage(to: string, message: string) {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
+export async function sendWhatsAppTextMessage(
+  to: string,
+  message: string,
+  overridePhoneNumberId?: string | null,
+  overrideAccessToken?: string | null
+) {
+  const phoneNumberId = overridePhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
+  const accessToken = overrideAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
 
   if (!phoneNumberId || !accessToken) {
     console.warn('[WhatsApp API] Credentials not configured in .env. Skipping external send.');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SidebarNav, ActiveView } from '@/components/SidebarNav';
 import { ConversationList } from '@/components/ConversationList';
 import { ChatArea } from '@/components/ChatArea';
@@ -10,14 +10,22 @@ import { AdminSettings } from '@/components/AdminSettings';
 import { LoginPage } from '@/components/LoginPage';
 import {
   MOCK_AGENTS,
+  MOCK_BUSINESSES,
   MOCK_CONVERSATIONS,
   MOCK_MESSAGES,
   MOCK_NOTES,
   CANNED_RESPONSES,
   INITIAL_SETTINGS,
 } from '@/lib/mock-data';
-import { Agent, Conversation, Message, InternalNote, AppSettings, MessageMediaType } from '@/types';
+import { Agent, Business, Conversation, Message, InternalNote, AppSettings, MessageMediaType } from '@/types';
 import { supabase } from '@/lib/supabase';
+import {
+  registerServiceWorker,
+  getNotificationPermission,
+  requestNotificationPermission,
+  playNotificationChime,
+  showIncomingNotification,
+} from '@/lib/notifications';
 
 export default function WhatsAppMultiAgentApp() {
   // Authentication State
@@ -25,8 +33,19 @@ export default function WhatsAppMultiAgentApp() {
   const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS);
   const [currentAgent, setCurrentAgent] = useState<Agent>(MOCK_AGENTS[0]);
 
-  // Navigation State
+  // Multi-Business State
+  const [businesses, setBusinesses] = useState<Business[]>(MOCK_BUSINESSES);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>('all');
+
+  // Navigation & Mobile Responsive State
   const [activeView, setActiveView] = useState<ActiveView>('inbox');
+  const [mobileShowChat, setMobileShowChat] = useState<boolean>(false);
+  const [mobileShowDetails, setMobileShowDetails] = useState<boolean>(false);
+
+  // Push Notification State
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstSyncRef = useRef<boolean>(true);
 
   // Inbox & Real-time State
   const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
@@ -45,8 +64,11 @@ export default function WhatsAppMultiAgentApp() {
     return INITIAL_SETTINGS;
   });
 
-  // On mount, sync saved credentials to the server-side runtime
+  // Register Service Worker & Check Notification Permission on mount
   useEffect(() => {
+    registerServiceWorker();
+    setNotificationPermission(getNotificationPermission());
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('whatsapp_app_settings');
       if (saved) {
@@ -60,32 +82,89 @@ export default function WhatsAppMultiAgentApp() {
         } catch (e) {}
       }
     }
+
+    // Listen for notification clicks from Service Worker
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const handler = (event: MessageEvent) => {
+        if (event.data?.type === 'NOTIFICATION_CLICK' && event.data.conversationId) {
+          setSelectedId(event.data.conversationId);
+          setActiveView('inbox');
+          setMobileShowChat(true);
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handler);
+      return () => navigator.serviceWorker.removeEventListener('message', handler);
+    }
   }, []);
 
   const selectedConv = conversations.find((c) => c.id === selectedId) || null;
+  const selectedConvBusiness = selectedConv?.business_id
+    ? businesses.find((b) => b.id === selectedConv.business_id) || null
+    : null;
   const currentMessages = selectedId ? messagesMap[selectedId] || [] : [];
   const currentNotes = selectedId ? notesMap[selectedId] || [] : [];
   const totalUnreadCount = conversations.reduce((acc, c) => acc + c.unread_count, 0);
 
-  // Fetch live conversations & messages from Supabase via /api/inbox
+  // Update Browser Tab Title with Unread Count
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title =
+        totalUnreadCount > 0
+          ? `(${totalUnreadCount}) WhatChat — Team Inbox`
+          : 'WhatChat — Multi-Business WhatsApp Inbox';
+    }
+  }, [totalUnreadCount]);
+
+  // Fetch live conversations, businesses & messages from Supabase via /api/inbox
   const syncLiveInbox = async () => {
     try {
       const res = await fetch(`/api/inbox?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
 
+      // Update live businesses if any exist in Supabase
+      if (data.businesses && data.businesses.length > 0) {
+        setBusinesses(data.businesses);
+      }
+
       if (data.conversations && data.conversations.length > 0) {
-        // Group messages by conversation_id
         const liveMsgMap: Record<string, Message[]> = { ...MOCK_MESSAGES };
+        const incomingNewCustomerMsgs: Message[] = [];
+
         (data.messages || []).forEach((m: Message) => {
           if (!liveMsgMap[m.conversation_id]) {
             liveMsgMap[m.conversation_id] = [];
           }
-          // Avoid duplicates
           if (!liveMsgMap[m.conversation_id].some((existing) => existing.id === m.id)) {
             liveMsgMap[m.conversation_id].push(m);
           }
+
+          // Detect brand-new incoming customer messages for Push Notification + Sound
+          if (!knownMessageIdsRef.current.has(m.id)) {
+            knownMessageIdsRef.current.add(m.id);
+            if (!isFirstSyncRef.current && m.sender_type === 'customer') {
+              incomingNewCustomerMsgs.push(m);
+            }
+          }
         });
+
+        isFirstSyncRef.current = false;
+
+        // Fire push notification & chime for new customer messages
+        if (incomingNewCustomerMsgs.length > 0) {
+          playNotificationChime();
+          const latest = incomingNewCustomerMsgs[incomingNewCustomerMsgs.length - 1];
+          const conv = data.conversations.find((c: Conversation) => c.id === latest.conversation_id);
+          const biz = businesses.find((b) => b.id === conv?.business_id);
+          const prefix = biz ? `[${biz.name}] ` : '';
+          const senderLabel = conv?.contact?.name || conv?.contact?.phone_number || 'Customer';
+
+          showIncomingNotification({
+            title: `${prefix}${senderLabel}`,
+            body: latest.text || 'Sent a new WhatsApp message',
+            conversationId: latest.conversation_id,
+          });
+        }
 
         // Group notes by conversation_id
         const liveNotesMap: Record<string, InternalNote[]> = { ...MOCK_NOTES };
@@ -99,13 +178,15 @@ export default function WhatsAppMultiAgentApp() {
         });
 
         // Merge live conversations at the top, followed by mock conversations
-        setConversations((prev) => {
+        setConversations(() => {
           const liveIds = new Set(data.conversations.map((c: Conversation) => c.id));
           const remainingMocks = MOCK_CONVERSATIONS.filter((m) => !liveIds.has(m.id));
           return [...data.conversations, ...remainingMocks];
         });
         setMessagesMap(liveMsgMap);
         setNotesMap(liveNotesMap);
+      } else {
+        isFirstSyncRef.current = false;
       }
     } catch (err) {
       console.warn('Live inbox sync error:', err);
@@ -140,6 +221,21 @@ export default function WhatsAppMultiAgentApp() {
     };
   }, []);
 
+  const handleEnableNotifications = async () => {
+    const perm = await requestNotificationPermission();
+    setNotificationPermission(perm);
+    if (perm === 'granted') {
+      playNotificationChime();
+      showIncomingNotification({
+        title: 'WhatChat Alerts Enabled 🔔',
+        body: 'You will now receive instant notifications for new WhatsApp messages.',
+        conversationId: selectedId || 'conv-1',
+      });
+    } else if (perm === 'denied') {
+      alert('Notifications were blocked in your browser settings. Please allow notifications for this site in your browser bar.');
+    }
+  };
+
   // 1. Send Message (with Text, Image, Voice, or Document)
   const handleSendMessage = async (
     text: string,
@@ -168,7 +264,6 @@ export default function WhatsAppMultiAgentApp() {
       [selectedConv.id]: [...(prev[selectedConv.id] || []), newMsg],
     }));
 
-    // Update conversation snippet
     setConversations((prev) =>
       prev.map((c) =>
         c.id === selectedConv.id
@@ -199,7 +294,6 @@ export default function WhatsAppMultiAgentApp() {
       if (!res.ok) {
         alert(`Failed to send WhatsApp message: ${result.error || 'Unknown error'}`);
       } else {
-        // Sync immediately so the DB-saved message replaces the temp one cleanly
         await syncLiveInbox();
       }
     } catch (e: any) {
@@ -208,9 +302,11 @@ export default function WhatsAppMultiAgentApp() {
     }
   };
 
-  // 2. Draft Reply with AI
+  // 2. Draft Reply with AI (using per-business AI context!)
   const handleDraftWithAI = async (): Promise<string> => {
     if (!selectedConv) return '';
+
+    const bizContext = selectedConvBusiness?.ai_context || settings.businessName;
 
     try {
       const res = await fetch('/api/ai/draft', {
@@ -219,7 +315,7 @@ export default function WhatsAppMultiAgentApp() {
         body: JSON.stringify({
           history: currentMessages,
           contactName: selectedConv.contact?.name,
-          businessContext: settings.businessName ? `Business: ${settings.businessName}` : undefined,
+          businessContext: bizContext,
         }),
       });
       const data = await res.json();
@@ -232,7 +328,7 @@ export default function WhatsAppMultiAgentApp() {
     if (lastCustomerMsg?.text?.toLowerCase().includes('licenses')) {
       return `Hi ${selectedConv.contact?.name || 'there'}, I would be happy to help add those 50 licenses to your account before Friday. I have alerted our provisioning team now.`;
     }
-    return `Hello ${selectedConv.contact?.name || 'there'}! Thanks for contacting ${settings.businessName || 'our team'}. I am looking into this for you right away.`;
+    return `Hello ${selectedConv.contact?.name || 'there'}! Thanks for contacting ${selectedConvBusiness?.name || settings.businessName || 'our team'}. I am looking into this for you right away.`;
   };
 
   // 3. Summarize with AI
@@ -291,7 +387,6 @@ export default function WhatsAppMultiAgentApp() {
     );
   };
 
-  // Show Login Page if signed out
   if (!isLoggedIn) {
     return (
       <LoginPage
@@ -305,58 +400,95 @@ export default function WhatsAppMultiAgentApp() {
   }
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-slate-100">
-      {/* 1. Slim Left Navigation Bar with Role Awareness */}
+    <div className="h-[100dvh] w-screen flex flex-col md:flex-row overflow-hidden bg-slate-100">
+      {/* 1. Navigation Rail (Desktop Left / Mobile Bottom) */}
       <SidebarNav
         activeView={activeView}
-        onSelectView={setActiveView}
+        onSelectView={(view) => {
+          setActiveView(view);
+          if (view !== 'inbox') setMobileShowChat(false);
+        }}
         currentAgent={currentAgent}
         unreadCount={totalUnreadCount}
+        notificationPermission={notificationPermission}
+        onEnableNotifications={handleEnableNotifications}
         onLogout={() => setIsLoggedIn(false)}
+        hideMobileBar={activeView === 'inbox' && mobileShowChat}
       />
 
-      {/* 2. Main Content Area according to Active View */}
+      {/* 2. Inbox View (Mobile Single-Pane Switcher / Desktop 3-Column) */}
       {activeView === 'inbox' && (
-        <div className="flex-1 flex overflow-hidden">
-          {/* Conversation Queue */}
-          <ConversationList
-            conversations={conversations}
-            selectedId={selectedId}
-            currentAgent={currentAgent}
-            agents={agents}
-            onSelect={(conv) => {
-              setSelectedId(conv.id);
-              setConversations((prev) =>
-                prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
-              );
-            }}
-          />
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Conversation Queue: Hidden on mobile when a chat is open */}
+          <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} w-full md:w-auto h-full`}>
+            <ConversationList
+              conversations={conversations}
+              selectedId={selectedId}
+              currentAgent={currentAgent}
+              agents={agents}
+              businesses={businesses}
+              selectedBusinessId={selectedBusinessId}
+              onSelectBusiness={setSelectedBusinessId}
+              onSelect={(conv) => {
+                setSelectedId(conv.id);
+                setMobileShowChat(true);
+                setConversations((prev) =>
+                  prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
+                );
+              }}
+            />
+          </div>
 
-          {/* Active Chat Area with Voice Notes & Attachments */}
-          <ChatArea
-            conversation={selectedConv}
-            messages={currentMessages}
-            currentAgent={currentAgent}
-            cannedResponses={CANNED_RESPONSES}
-            onSendMessage={handleSendMessage}
-            onDraftWithAI={handleDraftWithAI}
-            onStatusChange={handleStatusChange}
-          />
+          {/* Active Chat Area: Hidden on mobile when viewing list */}
+          <div className={`${mobileShowChat ? 'flex' : 'hidden md:flex'} flex-1 h-full min-w-0`}>
+            <ChatArea
+              conversation={selectedConv}
+              business={selectedConvBusiness}
+              messages={currentMessages}
+              currentAgent={currentAgent}
+              cannedResponses={CANNED_RESPONSES}
+              onSendMessage={handleSendMessage}
+              onDraftWithAI={handleDraftWithAI}
+              onStatusChange={handleStatusChange}
+              onBackMobile={() => setMobileShowChat(false)}
+              onOpenDetailsMobile={() => setMobileShowDetails(true)}
+            />
+          </div>
 
-          {/* Right Panel: CRM, Assignment & Notes */}
-          <RightPanel
-            conversation={selectedConv}
-            agents={agents}
-            currentAgent={currentAgent}
-            notes={currentNotes}
-            onAssignAgent={handleAssignAgent}
-            onAddNote={handleAddNote}
-            onSummarizeWithAI={handleSummarizeWithAI}
-          />
+          {/* Right Panel: Desktop fixed column */}
+          <div className="hidden lg:flex h-full">
+            <RightPanel
+              conversation={selectedConv}
+              agents={agents}
+              currentAgent={currentAgent}
+              notes={currentNotes}
+              onAssignAgent={handleAssignAgent}
+              onAddNote={handleAddNote}
+              onSummarizeWithAI={handleSummarizeWithAI}
+            />
+          </div>
+
+          {/* Right Panel: Mobile/Tablet Slide-Over Drawer */}
+          {mobileShowDetails && (
+            <div className="lg:hidden fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+              <div className="h-full w-full sm:w-80 bg-white shadow-2xl">
+                <RightPanel
+                  conversation={selectedConv}
+                  agents={agents}
+                  currentAgent={currentAgent}
+                  notes={currentNotes}
+                  onAssignAgent={handleAssignAgent}
+                  onAddNote={handleAddNote}
+                  onSummarizeWithAI={handleSummarizeWithAI}
+                  onCloseMobile={() => setMobileShowDetails(false)}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Analytics Dashboard View (Admin Company Stats vs Agent Personal Stats) */}
+      {/* Analytics Dashboard View */}
       {activeView === 'dashboard' && (
         <AnalyticsDashboard
           agents={agents}
@@ -365,18 +497,21 @@ export default function WhatsAppMultiAgentApp() {
           onOpenConversation={(convId) => {
             setSelectedId(convId);
             setActiveView('inbox');
+            setMobileShowChat(true);
           }}
         />
       )}
 
-      {/* Admin Settings View (Guarded for Administrators Only) */}
+      {/* Admin Settings View */}
       {activeView === 'settings' && (
         <AdminSettings
           settings={settings}
           agents={agents}
+          businesses={businesses}
           currentAgent={currentAgent}
           onSaveSettings={setSettings}
           onUpdateAgents={setAgents}
+          onUpdateBusinesses={setBusinesses}
           onSwitchAgent={(agent) => setCurrentAgent(agent)}
         />
       )}

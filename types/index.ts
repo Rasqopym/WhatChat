@@ -1,5 +1,16 @@
 export type AgentRole = 'admin' | 'agent';
 
+export interface Business {
+  id: string;
+  name: string;
+  display_phone_number: string;
+  whatsapp_phone_number_id: string;
+  whatsapp_access_token?: string;
+  brand_color: string;
+  ai_context?: string;
+  created_at?: string;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -8,12 +19,14 @@ export interface Agent {
   role: AgentRole;
   is_online: boolean;
   active_conversation_id?: string | null;
+  assigned_business_ids?: string[]; // empty or undefined = all businesses for admins
   chats_handled?: number;
   avg_response_time?: string;
 }
 
 export interface Contact {
   id: string;
+  business_id?: string | null;
   phone_number: string;
   name?: string;
   email?: string;
@@ -27,6 +40,8 @@ export type PriorityLevel = 'low' | 'normal' | 'urgent';
 
 export interface Conversation {
   id: string;
+  business_id?: string | null;
+  business?: Business | null;
   contact_id: string;
   contact?: Contact;
   assigned_agent_id?: string | null;
@@ -70,6 +85,7 @@ export interface InternalNote {
 
 export interface CannedResponse {
   id: string;
+  business_id?: string | null;
   shortcut: string;
   title: string;
   content: string;

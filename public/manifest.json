@@ -1,0 +1,10 @@
+{
+  "name": "WhatChat - Multi-Business WhatsApp Inbox",
+  "short_name": "WhatChat",
+  "description": "AI-Powered Multi-Agent & Multi-Business WhatsApp Team Inbox",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#075E54",
+  "theme_color": "#075E54",
+  "orientation": "portrait-primary"
+}

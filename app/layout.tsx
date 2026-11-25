@@ -1,9 +1,23 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'WhatsApp Business Team Inbox (Multi-Agent)',
-  description: 'AI-Powered WhatsApp Multi-Agent Business Inbox supporting 10+ simultaneous team members',
+  title: 'WhatChat — Multi-Business WhatsApp Team Inbox',
+  description: 'AI-Powered Multi-Agent & Multi-Business WhatsApp Inbox supporting 10+ simultaneous team members',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'WhatChat',
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#075E54',
 };
 
 export default function RootLayout({
@@ -13,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="h-screen w-screen overflow-hidden bg-slate-100">{children}</body>
+      <body className="h-[100dvh] w-screen overflow-hidden bg-slate-100 antialiased">{children}</body>
     </html>
   );
 }

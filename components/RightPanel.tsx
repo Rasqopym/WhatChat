@@ -13,7 +13,8 @@ import {
   CheckCircle,
   Loader2,
   Shield,
-  User
+  User,
+  X
 } from 'lucide-react';
 
 interface RightPanelProps {
@@ -24,6 +25,7 @@ interface RightPanelProps {
   onAssignAgent: (agentId: string | null) => void;
   onAddNote: (content: string) => Promise<void>;
   onSummarizeWithAI: () => Promise<string>;
+  onCloseMobile?: () => void;
 }
 
 export const RightPanel: React.FC<RightPanelProps> = ({
@@ -34,6 +36,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   onAssignAgent,
   onAddNote,
   onSummarizeWithAI,
+  onCloseMobile,
 }) => {
   const isAdmin = currentAgent.role === 'admin';
   const [activeTab, setActiveTab] = useState<'details' | 'notes' | 'ai'>('details');
@@ -70,7 +73,16 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   };
 
   return (
-    <aside className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-sm z-10">
+    <aside className="w-full sm:w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-sm z-10">
+      {/* Mobile Close Header */}
+      {onCloseMobile && (
+        <div className="lg:hidden h-14 px-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <span className="text-sm font-bold text-slate-800">Conversation Details</span>
+          <button onClick={onCloseMobile} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200 text-xs font-semibold bg-slate-50">
         <button

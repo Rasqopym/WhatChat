@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Conversation, Message, Agent, CannedResponse, MessageMediaType } from '@/types';
+import { Conversation, Message, Agent, CannedResponse, MessageMediaType, Business } from '@/types';
 import { 
   Send, 
   Sparkles, 
@@ -19,27 +19,35 @@ import {
   Zap,
   Loader2,
   Download,
-  X
+  X,
+  ArrowLeft,
+  Info
 } from 'lucide-react';
 
 interface ChatAreaProps {
   conversation: Conversation | null;
+  business?: Business | null;
   messages: Message[];
   currentAgent: Agent;
   cannedResponses: CannedResponse[];
   onSendMessage: (text: string, media?: { type: MessageMediaType; url: string; name?: string; duration?: number }) => Promise<void>;
   onDraftWithAI: () => Promise<string>;
   onStatusChange: (status: 'open' | 'pending' | 'closed') => void;
+  onBackMobile?: () => void;
+  onOpenDetailsMobile?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
+  business,
   messages,
   currentAgent,
   cannedResponses,
   onSendMessage,
   onDraftWithAI,
   onStatusChange,
+  onBackMobile,
+  onOpenDetailsMobile,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -192,41 +200,70 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <main className="flex-1 flex flex-col h-full bg-[#EFEAE2] relative overflow-hidden">
       {/* 1. Header */}
-      <div className="h-16 bg-white border-b border-slate-200 px-5 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-slate-700 font-bold border border-slate-300">
+      <div className="h-16 bg-white border-b border-slate-200 px-3 md:px-5 flex items-center justify-between shadow-sm z-10 gap-2">
+        <div className="flex items-center space-x-2.5 min-w-0">
+          {onBackMobile && (
+            <button
+              onClick={onBackMobile}
+              className="md:hidden p-1.5 -ml-1 text-slate-600 hover:bg-slate-100 rounded-lg flex-shrink-0"
+              aria-label="Back to chats"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-slate-700 font-bold border border-slate-300 flex-shrink-0">
             {conversation.contact?.avatar_url ? (
               <img src={conversation.contact.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               conversation.contact?.name?.[0] || <User className="w-5 h-5 text-slate-500" />
             )}
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-sm font-bold text-slate-900">
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1.5">
+              <h2 className="text-sm font-bold text-slate-900 truncate">
                 {conversation.contact?.name || conversation.contact?.phone_number}
               </h2>
               {conversation.priority === 'urgent' && (
-                <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-semibold px-2 py-0.5 rounded-full">
-                  Urgent Priority
+                <span className="hidden sm:inline-block text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                  Urgent
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-mono">{conversation.contact?.phone_number}</p>
+            <div className="flex items-center space-x-1.5 text-xs text-slate-500">
+              <span className="font-mono truncate">{conversation.contact?.phone_number}</span>
+              {business && (
+                <span
+                  style={{ backgroundColor: `${business.brand_color}18`, color: business.brand_color }}
+                  className="text-[10px] font-bold px-1.5 py-0.2 rounded truncate"
+                >
+                  • {business.name}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Status Dropdown */}
-        <div className="flex items-center space-x-3">
+        {/* Status Dropdown & Mobile Info Drawer Button */}
+        <div className="flex items-center space-x-2 flex-shrink-0">
           <select
             value={conversation.status}
             onChange={(e) => onStatusChange(e.target.value as any)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
+            className="text-xs font-semibold px-2 md:px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
           >
             <option value="open">🟢 Open</option>
-            <option value="pending">🟡 Pending Response</option>
+            <option value="pending">🟡 Pending</option>
             <option value="closed">⚪ Closed</option>
           </select>
+
+          {onOpenDetailsMobile && (
+            <button
+              onClick={onOpenDetailsMobile}
+              className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200"
+              title="Customer Info, Assignment & AI"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -46,7 +46,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   // ==========================================
   if (!isAdmin) {
     return (
-      <div className="flex-1 bg-slate-50 overflow-y-auto p-6 md:p-8 space-y-8">
+      <div className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
@@ -181,7 +181,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   // 2. ADMINISTRATOR COMPANY-WIDE DASHBOARD
   // ==========================================
   return (
-    <div className="flex-1 bg-slate-50 overflow-y-auto p-6 md:p-8 space-y-8">
+    <div className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>

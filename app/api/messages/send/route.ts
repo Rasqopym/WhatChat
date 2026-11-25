@@ -30,8 +30,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Customer phone number missing' }, { status: 400 });
     }
 
-    // 2. Dispatch to Meta WhatsApp API
-    const sendResult = await sendWhatsAppTextMessage(recipientPhone, text || media?.name || 'Attachment');
+    // 2. Resolve per-business WhatsApp credentials if conversation belongs to a business
+    let bizPhoneId: string | null = null;
+    let bizToken: string | null = null;
+    if (conversation.business_id) {
+      try {
+        const { data: biz } = await supabase
+          .from('businesses')
+          .select('whatsapp_phone_number_id, whatsapp_access_token')
+          .eq('id', conversation.business_id)
+          .maybeSingle();
+        if (biz) {
+          bizPhoneId = biz.whatsapp_phone_number_id;
+          bizToken = biz.whatsapp_access_token;
+        }
+      } catch {
+        // Fallback to default env credentials
+      }
+    }
+
+    // 3. Dispatch to Meta WhatsApp API using business-specific or default credentials
+    const sendResult = await sendWhatsAppTextMessage(
+      recipientPhone,
+      text || media?.name || 'Attachment',
+      bizPhoneId,
+      bizToken
+    );
 
     // 3. Record in messages table (only valid schema columns; sender_id only if valid UUID)
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;

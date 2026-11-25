@@ -1,22 +1,51 @@
-import { Agent, Conversation, Message, InternalNote, CannedResponse, AppSettings } from '@/types';
+import { Agent, Business, Conversation, Message, InternalNote, CannedResponse, AppSettings } from '@/types';
 
-// The 10 Team Members with Performance Metrics
+// Multi-Business Workspaces
+export const MOCK_BUSINESSES: Business[] = [
+  {
+    id: 'biz-1',
+    name: 'Black Panther',
+    display_phone_number: '+234 805 277 9457',
+    whatsapp_phone_number_id: '1059295340602163',
+    brand_color: '#128C7E',
+    ai_context: 'Black Panther Enterprise Logistics & Software. Fast onboarding, 24/7 VIP support.',
+  },
+  {
+    id: 'biz-2',
+    name: 'Webliska Retail',
+    display_phone_number: '+44 7911 123456',
+    whatsapp_phone_number_id: '209842398412094',
+    brand_color: '#6366f1',
+    ai_context: 'Webliska Retail E-commerce. 30-day returns, worldwide shipping, order tracking.',
+  },
+  {
+    id: 'biz-3',
+    name: 'Apex Advisory',
+    display_phone_number: '+1 415 555 0199',
+    whatsapp_phone_number_id: '309842398412095',
+    brand_color: '#d97706',
+    ai_context: 'Apex Advisory Consulting. Enterprise tax, compliance, and APAC expansion.',
+  },
+];
+
+// The 10 Team Members with Performance Metrics & Business Access
 export const MOCK_AGENTS: Agent[] = [
-  { id: 'agent-1', name: 'Sarah Jenkins', email: 'sarah@business.com', role: 'admin', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80', chats_handled: 84, avg_response_time: '1m 20s' },
-  { id: 'agent-2', name: 'Marcus Vance', email: 'marcus@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', chats_handled: 76, avg_response_time: '1m 45s' },
-  { id: 'agent-3', name: 'Elena Rostova', email: 'elena@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80', chats_handled: 62, avg_response_time: '2m 10s' },
-  { id: 'agent-4', name: 'David Kim', email: 'david@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', chats_handled: 45, avg_response_time: '2m 30s' },
-  { id: 'agent-5', name: 'Amara Okafor', email: 'amara@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80', chats_handled: 59, avg_response_time: '1m 15s' },
-  { id: 'agent-6', name: 'Lucas Silva', email: 'lucas@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=100&auto=format&fit=crop&q=80', chats_handled: 38, avg_response_time: '3m 05s' },
-  { id: 'agent-7', name: 'Chloe Dubois', email: 'chloe@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80', chats_handled: 51, avg_response_time: '1m 50s' },
-  { id: 'agent-8', name: 'Tariq Al-Mansoor', email: 'tariq@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&auto=format&fit=crop&q=80', chats_handled: 68, avg_response_time: '1m 35s' },
-  { id: 'agent-9', name: 'Emily Watson', email: 'emily@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80', chats_handled: 33, avg_response_time: '2m 40s' },
-  { id: 'agent-10', name: 'Kenji Sato', email: 'kenji@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&auto=format&fit=crop&q=80', chats_handled: 72, avg_response_time: '1m 25s' },
+  { id: 'agent-1', name: 'Sarah Jenkins', email: 'sarah@business.com', role: 'admin', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80', chats_handled: 84, avg_response_time: '1m 20s', assigned_business_ids: ['biz-1', 'biz-2', 'biz-3'] },
+  { id: 'agent-2', name: 'Marcus Vance', email: 'marcus@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', chats_handled: 76, avg_response_time: '1m 45s', assigned_business_ids: ['biz-1', 'biz-2'] },
+  { id: 'agent-3', name: 'Elena Rostova', email: 'elena@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80', chats_handled: 62, avg_response_time: '2m 10s', assigned_business_ids: ['biz-1', 'biz-3'] },
+  { id: 'agent-4', name: 'David Kim', email: 'david@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', chats_handled: 45, avg_response_time: '2m 30s', assigned_business_ids: ['biz-2'] },
+  { id: 'agent-5', name: 'Amara Okafor', email: 'amara@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80', chats_handled: 59, avg_response_time: '1m 15s', assigned_business_ids: ['biz-1'] },
+  { id: 'agent-6', name: 'Lucas Silva', email: 'lucas@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=100&auto=format&fit=crop&q=80', chats_handled: 38, avg_response_time: '3m 05s', assigned_business_ids: ['biz-2', 'biz-3'] },
+  { id: 'agent-7', name: 'Chloe Dubois', email: 'chloe@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80', chats_handled: 51, avg_response_time: '1m 50s', assigned_business_ids: ['biz-1', 'biz-2'] },
+  { id: 'agent-8', name: 'Tariq Al-Mansoor', email: 'tariq@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&auto=format&fit=crop&q=80', chats_handled: 68, avg_response_time: '1m 35s', assigned_business_ids: ['biz-1', 'biz-3'] },
+  { id: 'agent-9', name: 'Emily Watson', email: 'emily@business.com', role: 'agent', is_online: false, avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80', chats_handled: 33, avg_response_time: '2m 40s', assigned_business_ids: ['biz-2'] },
+  { id: 'agent-10', name: 'Kenji Sato', email: 'kenji@business.com', role: 'agent', is_online: true, avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&auto=format&fit=crop&q=80', chats_handled: 72, avg_response_time: '1m 25s', assigned_business_ids: ['biz-1', 'biz-2', 'biz-3'] },
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: 'conv-1',
+    business_id: 'biz-1',
     contact_id: 'contact-1',
     contact: {
       id: 'contact-1',
@@ -36,6 +65,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: 'conv-2',
+    business_id: 'biz-2',
     contact_id: 'contact-2',
     contact: {
       id: 'contact-2',
@@ -55,6 +85,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: 'conv-3',
+    business_id: 'biz-3',
     contact_id: 'contact-3',
     contact: {
       id: 'contact-3',
@@ -73,6 +104,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: 'conv-4',
+    business_id: 'biz-1',
     contact_id: 'contact-4',
     contact: {
       id: 'contact-4',

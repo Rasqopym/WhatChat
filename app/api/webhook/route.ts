@@ -132,6 +132,22 @@ export async function POST(req: NextRequest) {
       const customerName = contactInfo?.profile?.name || `Customer +${fromPhone}`;
       const messageId = incoming.id;
       const messageType = incoming.type;
+      const incomingPhoneNumberId = value.metadata?.phone_number_id;
+
+      // Multi-Business Resolution: look up which business owns this Phone Number ID
+      let resolvedBusinessId: string | null = null;
+      if (incomingPhoneNumberId) {
+        try {
+          const { data: biz } = await supabase
+            .from('businesses')
+            .select('id')
+            .eq('whatsapp_phone_number_id', incomingPhoneNumberId)
+            .maybeSingle();
+          if (biz?.id) resolvedBusinessId = biz.id;
+        } catch {
+          // Graceful fallback if businesses table hasn't been migrated yet
+        }
+      }
 
       let messageText = '';
       if (messageType === 'text') {
@@ -146,21 +162,27 @@ export async function POST(req: NextRequest) {
         messageText = `[${messageType} message]`;
       }
 
-      // Step A: Find or create the Contact
-      let { data: contact } = await supabase
+      // Step A: Find or create the Contact (scoped to business if resolved)
+      let contactQuery = supabase
         .from('contacts')
         .select('*')
-        .eq('phone_number', fromPhone)
-        .single();
+        .eq('phone_number', fromPhone);
+      if (resolvedBusinessId) {
+        contactQuery = contactQuery.eq('business_id', resolvedBusinessId);
+      }
+      let { data: contact } = await contactQuery.maybeSingle();
 
       if (!contact) {
+        const contactPayload: Record<string, any> = {
+          phone_number: fromPhone,
+          name: customerName,
+          tags: ['New Customer'],
+        };
+        if (resolvedBusinessId) contactPayload.business_id = resolvedBusinessId;
+
         const { data: newContact, error: contactErr } = await supabase
           .from('contacts')
-          .insert({
-            phone_number: fromPhone,
-            name: customerName,
-            tags: ['New Customer'],
-          })
+          .insert(contactPayload)
           .select()
           .single();
 
@@ -191,15 +213,18 @@ export async function POST(req: NextRequest) {
           console.warn('Triage failed:', e);
         }
 
+        const convPayload: Record<string, any> = {
+          contact_id: contact.id,
+          status: 'open',
+          priority: triage.priority,
+          last_message_text: messageText,
+          unread_count: 1,
+        };
+        if (resolvedBusinessId) convPayload.business_id = resolvedBusinessId;
+
         const { data: newConv } = await supabase
           .from('conversations')
-          .insert({
-            contact_id: contact.id,
-            status: 'open',
-            priority: triage.priority,
-            last_message_text: messageText,
-            unread_count: 1,
-          })
+          .insert(convPayload)
           .select()
           .single();
 

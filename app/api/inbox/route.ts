@@ -39,11 +39,24 @@ export async function GET() {
       console.error('[Inbox API] Notes error:', notesError);
     }
 
+    // 4. Fetch businesses (graceful if migration hasn't run yet)
+    let businesses: any[] = [];
+    try {
+      const { data: bizData } = await supabase
+        .from('businesses')
+        .select('id, name, display_phone_number, whatsapp_phone_number_id, brand_color, ai_context, created_at')
+        .order('created_at', { ascending: true });
+      if (bizData) businesses = bizData;
+    } catch {
+      // Ignore if businesses table doesn't exist yet
+    }
+
     return NextResponse.json(
       {
         conversations: conversations || [],
         messages: messages || [],
         notes: notes || [],
+        businesses,
       },
       {
         headers: {
