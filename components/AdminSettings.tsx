@@ -114,8 +114,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       ai_context: newBizContext.trim(),
     };
 
-    if (editingBizId) {
-      // Update existing business
+    const saveBizList = (updatedList: Business[]) => {
+      onUpdateBusinesses(updatedList);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('whatsapp_businesses', JSON.stringify(updatedList));
+      }
+    };
+
+    const isMockId = editingBizId?.startsWith('biz-');
+
+    if (editingBizId && !isMockId) {
+      // Update existing DB business
       try {
         const res = await fetch('/api/businesses', {
           method: 'PATCH',
@@ -124,12 +133,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         });
         const data = await res.json();
         const updatedBiz = res.ok && data.business ? data.business : { ...payload, id: editingBizId };
-        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...updatedBiz, id: editingBizId } : b)));
+        saveBizList(businesses.map((b) => (b.id === editingBizId ? { ...b, ...updatedBiz, id: editingBizId } : b)));
       } catch {
-        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload, id: editingBizId } : b)));
+        saveBizList(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload, id: editingBizId } : b)));
       }
     } else {
-      // Create new business
+      // Create new business (or promote edited mock business to Supabase)
       try {
         const res = await fetch('/api/businesses', {
           method: 'POST',
@@ -138,12 +147,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.business) {
-          onUpdateBusinesses([...businesses, data.business]);
+          if (editingBizId) {
+            saveBizList(businesses.map((b) => (b.id === editingBizId ? data.business : b)));
+          } else {
+            saveBizList([...businesses, data.business]);
+          }
         } else {
-          onUpdateBusinesses([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
+          if (editingBizId) {
+            saveBizList(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload, id: editingBizId } : b)));
+          } else {
+            saveBizList([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
+          }
         }
       } catch {
-        onUpdateBusinesses([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
+        if (editingBizId) {
+          saveBizList(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload, id: editingBizId } : b)));
+        } else {
+          saveBizList([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
+        }
       }
     }
 
@@ -158,7 +179,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const handleDeleteBusiness = async (bizId: string) => {
     if (!isAdmin) return;
-    onUpdateBusinesses(businesses.filter((b) => b.id !== bizId));
+    const updated = businesses.filter((b) => b.id !== bizId);
+    onUpdateBusinesses(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('whatsapp_businesses', JSON.stringify(updated));
+    }
     try {
       await fetch(`/api/businesses?id=${bizId}`, { method: 'DELETE' });
     } catch {}

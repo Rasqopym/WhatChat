@@ -34,7 +34,17 @@ export default function WhatsAppMultiAgentApp() {
   const [currentAgent, setCurrentAgent] = useState<Agent>(MOCK_AGENTS[0]);
 
   // Multi-Business State
-  const [businesses, setBusinesses] = useState<Business[]>(MOCK_BUSINESSES);
+  const [businesses, setBusinesses] = useState<Business[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('whatsapp_businesses');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return MOCK_BUSINESSES;
+  });
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('all');
 
   // Navigation & Mobile Responsive State
