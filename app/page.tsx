@@ -397,6 +397,27 @@ export default function WhatsAppMultiAgentApp() {
     );
   };
 
+  // 7. Update Customer Labels / Tags
+  const handleUpdateTags = async (contactId: string, tags: string[]) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.contact_id === contactId && c.contact
+          ? { ...c, contact: { ...c.contact, tags } }
+          : c
+      )
+    );
+
+    try {
+      await fetch('/api/contacts/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, tags }),
+      });
+    } catch (e) {
+      console.warn('Failed to persist tags to Supabase:', e);
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <LoginPage
@@ -475,6 +496,7 @@ export default function WhatsAppMultiAgentApp() {
               onAssignAgent={handleAssignAgent}
               onAddNote={handleAddNote}
               onSummarizeWithAI={handleSummarizeWithAI}
+              onUpdateTags={handleUpdateTags}
             />
           </div>
 
@@ -490,6 +512,7 @@ export default function WhatsAppMultiAgentApp() {
                   onAssignAgent={handleAssignAgent}
                   onAddNote={handleAddNote}
                   onSummarizeWithAI={handleSummarizeWithAI}
+                  onUpdateTags={handleUpdateTags}
                   onCloseMobile={() => setMobileShowDetails(false)}
                 />
               </div>

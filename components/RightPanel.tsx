@@ -25,8 +25,11 @@ interface RightPanelProps {
   onAssignAgent: (agentId: string | null) => void;
   onAddNote: (content: string) => Promise<void>;
   onSummarizeWithAI: () => Promise<string>;
+  onUpdateTags?: (contactId: string, tags: string[]) => void;
   onCloseMobile?: () => void;
 }
+
+const PRESET_LABELS = ['VIP', 'Sales Lead', 'Support', 'Billing', 'Paid', 'Follow Up', 'Urgent'];
 
 export const RightPanel: React.FC<RightPanelProps> = ({
   conversation,
@@ -36,11 +39,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   onAssignAgent,
   onAddNote,
   onSummarizeWithAI,
+  onUpdateTags,
   onCloseMobile,
 }) => {
   const isAdmin = currentAgent.role === 'admin';
   const [activeTab, setActiveTab] = useState<'details' | 'notes' | 'ai'>('details');
   const [newNote, setNewNote] = useState('');
+  const [newTagInput, setNewTagInput] = useState('');
   const [isPostingNote, setIsPostingNote] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -179,22 +184,87 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               </div>
             </div>
 
-            {/* 3. Customer Tags */}
-            <div className="space-y-2 pt-3 border-t border-slate-100">
+            {/* 3. Customer Labels / Tags (Interactive) */}
+            <div className="space-y-2.5 pt-3 border-t border-slate-100">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-slate-500" />
-                <span>Customer Tags</span>
+                <span>Chat Labels / Tags</span>
               </h3>
+
+              {/* Active Labels with Remove (x) */}
               <div className="flex flex-wrap gap-1.5">
-                {conversation.contact?.tags?.map((tag, idx) => (
+                {(conversation.contact?.tags || []).map((tag, idx) => (
                   <span
                     key={idx}
-                    className="text-xs bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full font-medium"
+                    className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1"
                   >
-                    {tag}
+                    <span>{tag}</span>
+                    {onUpdateTags && conversation.contact?.id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = (conversation.contact?.tags || []).filter((_, i) => i !== idx);
+                          onUpdateTags(conversation.contact!.id, updated);
+                        }}
+                        className="text-emerald-600 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
+                        title="Remove label"
+                      >
+                        ×
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
+
+              {/* Add Custom Label Input */}
+              {onUpdateTags && conversation.contact?.id && (
+                <>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const clean = newTagInput.trim();
+                      if (!clean) return;
+                      const currentTags = conversation.contact?.tags || [];
+                      if (!currentTags.includes(clean)) {
+                        onUpdateTags(conversation.contact!.id, [...currentTags, clean]);
+                      }
+                      setNewTagInput('');
+                    }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <input
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      placeholder="Add custom label..."
+                      className="flex-1 text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-[#128C7E] hover:bg-[#075E54] text-white text-xs font-semibold rounded-lg cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </form>
+
+                  {/* Quick-Add Preset Labels */}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {PRESET_LABELS.filter((p) => !(conversation.contact?.tags || []).includes(p)).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          const currentTags = conversation.contact?.tags || [];
+                          onUpdateTags(conversation.contact!.id, [...currentTags, preset]);
+                        }}
+                        className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200 cursor-pointer transition-colors"
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}
