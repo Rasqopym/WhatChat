@@ -70,7 +70,7 @@ export default function WhatsAppMultiAgentApp() {
   // Fetch live conversations & messages from Supabase via /api/inbox
   const syncLiveInbox = async () => {
     try {
-      const res = await fetch('/api/inbox', { cache: 'no-store' });
+      const res = await fetch(`/api/inbox?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
 

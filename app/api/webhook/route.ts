@@ -99,14 +99,12 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServiceSupabase();
 
-    // Support both Meta Production format (entry[0].changes[0].value)
-    // and Meta Dashboard "Test" button format (field: "messages", value: {...})
-    let value = null;
-    if (body.object === 'whatsapp_business_account') {
-      value = body.entry?.[0]?.changes?.[0]?.value;
-    } else if (body.field === 'messages' && body.value) {
-      value = body.value;
-    } else {
+    // Support Meta Production format, Meta Test payload with entry[], and direct field/value format
+    const value =
+      body.entry?.[0]?.changes?.[0]?.value ||
+      (body.field === 'messages' ? body.value : null);
+
+    if (!value) {
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
 
