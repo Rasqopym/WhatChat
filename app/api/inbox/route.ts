@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -38,11 +39,18 @@ export async function GET() {
       console.error('[Inbox API] Notes error:', notesError);
     }
 
-    return NextResponse.json({
-      conversations: conversations || [],
-      messages: messages || [],
-      notes: notes || [],
-    });
+    return NextResponse.json(
+      {
+        conversations: conversations || [],
+        messages: messages || [],
+        notes: notes || [],
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('[Inbox API] Unexpected error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
