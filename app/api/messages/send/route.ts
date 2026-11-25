@@ -71,8 +71,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Record in messages table (only valid schema columns; sender_id only if valid UUID)
+    // 4. Record in messages table without storing heavy base64 blobs in PostgreSQL
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
+    const safeMediaUrl = media?.url && !media.url.startsWith('data:') ? media.url : null;
+    const mediaLabel =
+      media?.type === 'image'
+        ? `📷 Photo: ${media.name || 'image'}`
+        : media?.type === 'video'
+        ? `🎥 Video: ${media.name || 'video'}`
+        : media?.type === 'audio'
+        ? '🎤 Voice message'
+        : media?.type === 'document'
+        ? `📄 Document: ${media.name || 'file'}`
+        : '';
+    const storedText = media ? (text ? `${mediaLabel}\n${text}` : mediaLabel) : text;
 
     const { data: message, error: msgError } = await supabase
       .from('messages')
@@ -80,9 +92,9 @@ export async function POST(req: NextRequest) {
         conversation_id: conversationId,
         sender_type: 'agent',
         sender_id: validSenderId,
-        text: text,
+        text: storedText,
         media_type: media?.type || null,
-        media_url: media?.url || null,
+        media_url: safeMediaUrl,
         status: sendResult.simulated ? 'delivered' : 'sent',
         whatsapp_message_id: sendResult.messageId || null,
       })
