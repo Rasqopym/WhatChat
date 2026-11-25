@@ -150,14 +150,37 @@ export async function POST(req: NextRequest) {
       }
 
       let messageText = '';
+      let inboundMediaType: string | null = null;
+      let inboundMediaUrl: string | null = null;
+
+      const buildMediaProxyUrl = (mediaId?: string, filename?: string) => {
+        if (!mediaId) return null;
+        const params = new URLSearchParams();
+        if (resolvedBusinessId) params.set('businessId', resolvedBusinessId);
+        if (filename) params.set('filename', filename);
+        const qs = params.toString();
+        return `/api/media/${mediaId}${qs ? `?${qs}` : ''}`;
+      };
+
       if (messageType === 'text') {
         messageText = incoming.text?.body || '';
       } else if (messageType === 'image') {
-        messageText = incoming.image?.caption || '[Image received]';
+        inboundMediaType = 'image';
+        inboundMediaUrl = buildMediaProxyUrl(incoming.image?.id);
+        messageText = incoming.image?.caption || '📷 Photo';
+      } else if (messageType === 'video') {
+        inboundMediaType = 'video';
+        inboundMediaUrl = buildMediaProxyUrl(incoming.video?.id);
+        messageText = incoming.video?.caption || '🎥 Video';
       } else if (messageType === 'audio') {
-        messageText = '[Voice note received]';
+        inboundMediaType = 'audio';
+        inboundMediaUrl = buildMediaProxyUrl(incoming.audio?.id);
+        messageText = '🎤 Voice message';
       } else if (messageType === 'document') {
-        messageText = incoming.document?.filename ? `[Document: ${incoming.document.filename}]` : '[Document received]';
+        inboundMediaType = 'document';
+        const docName = incoming.document?.filename || 'Document';
+        inboundMediaUrl = buildMediaProxyUrl(incoming.document?.id, docName);
+        messageText = incoming.document?.caption ? `${docName} — ${incoming.document.caption}` : `📄 ${docName}`;
       } else {
         messageText = `[${messageType} message]`;
       }
@@ -237,6 +260,8 @@ export async function POST(req: NextRequest) {
           conversation_id: conversation.id,
           sender_type: 'customer',
           text: messageText,
+          media_type: inboundMediaType,
+          media_url: inboundMediaUrl,
           status: 'delivered',
           whatsapp_message_id: messageId,
         });

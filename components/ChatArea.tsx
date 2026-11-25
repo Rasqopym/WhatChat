@@ -65,6 +65,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Audio Playback State
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // File Attachment State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -242,11 +243,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setShowCanned(false);
   };
 
-  const toggleAudioPlay = (msgId: string) => {
+  const toggleAudioPlay = (msgId: string, mediaUrl?: string) => {
     if (playingAudioId === msgId) {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+      }
       setPlayingAudioId(null);
     } else {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+      }
       setPlayingAudioId(msgId);
+      if (mediaUrl) {
+        const audio = new Audio(mediaUrl);
+        audioElementRef.current = audio;
+        audio.onended = () => setPlayingAudioId(null);
+        audio.onerror = () => setPlayingAudioId(null);
+        audio.play().catch(() => setPlayingAudioId(null));
+      }
     }
   };
 
@@ -382,8 +396,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {msg.media_type === 'audio' && (
                   <div className="flex items-center space-x-3 py-1 px-2 bg-black/5 rounded-xl mb-1 min-w-[220px]">
                     <button
-                      onClick={() => toggleAudioPlay(msg.id)}
-                      className="w-9 h-9 rounded-full bg-[#128C7E] text-white flex items-center justify-center flex-shrink-0 shadow-sm"
+                      onClick={() => toggleAudioPlay(msg.id, msg.media_url)}
+                      className="w-9 h-9 rounded-full bg-[#128C7E] text-white flex items-center justify-center flex-shrink-0 shadow-sm cursor-pointer"
                     >
                       {playingAudioId === msg.id ? (
                         <Pause className="w-4 h-4 fill-white" />
@@ -417,13 +431,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <FileText className="w-8 h-8 text-rose-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold text-slate-800 truncate">
-                        {msg.media_name || 'Document.pdf'}
+                        {msg.media_name || (msg.text?.replace('📄 ', '') || 'Document')}
                       </div>
-                      <div className="text-[10px] text-slate-500">PDF Document • 240 KB</div>
+                      <div className="text-[10px] text-slate-500">Document Attachment</div>
                     </div>
-                    <button className="p-1.5 hover:bg-black/10 rounded-lg text-slate-600" title="Download">
-                      <Download className="w-4 h-4" />
-                    </button>
+                    {msg.media_url ? (
+                      <a
+                        href={msg.media_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={msg.media_name || 'document'}
+                        className="p-1.5 hover:bg-black/10 rounded-lg text-slate-600 cursor-pointer"
+                        title="Open / Download Document"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    ) : (
+                      <span className="p-1.5 text-slate-400" title="Saved without file blob">
+                        <Download className="w-4 h-4" />
+                      </span>
+                    )}
                   </div>
                 )}
 
