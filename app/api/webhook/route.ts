@@ -10,6 +10,69 @@ import { activeSettings } from '@/lib/settings-store';
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
+
+  // Built-in diagnostic test: /api/webhook?simulate=true
+  if (searchParams.get('simulate') === 'true') {
+    try {
+      const supabase = getServiceSupabase();
+      const testPhone = '2348161354532';
+
+      let { data: contact, error: findErr } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('phone_number', testPhone)
+        .maybeSingle();
+
+      if (findErr) {
+        return NextResponse.json({ step: 'find_contact', error: findErr }, { status: 500 });
+      }
+
+      if (!contact) {
+        const { data: newContact, error: createErr } = await supabase
+          .from('contacts')
+          .insert({ phone_number: testPhone, name: 'Test Customer', tags: ['Test'] })
+          .select()
+          .single();
+
+        if (createErr) {
+          return NextResponse.json({ step: 'create_contact', error: createErr }, { status: 500 });
+        }
+        contact = newContact;
+      }
+
+      const { data: conv, error: convErr } = await supabase
+        .from('conversations')
+        .insert({
+          contact_id: contact.id,
+          status: 'open',
+          priority: 'normal',
+          last_message_text: 'Hello! Testing live Supabase connection.',
+          unread_count: 1,
+        })
+        .select()
+        .single();
+
+      if (convErr) {
+        return NextResponse.json({ step: 'create_conversation', error: convErr }, { status: 500 });
+      }
+
+      const { error: msgErr } = await supabase.from('messages').insert({
+        conversation_id: conv.id,
+        sender_type: 'customer',
+        text: 'Hello! Testing live Supabase connection.',
+        status: 'delivered',
+      });
+
+      if (msgErr) {
+        return NextResponse.json({ step: 'create_message', error: msgErr }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, conversationId: conv.id });
+    } catch (err: any) {
+      return NextResponse.json({ step: 'exception', error: err.message }, { status: 500 });
+    }
+  }
+
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
@@ -32,6 +95,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log('[Webhook POST] Received payload:', JSON.stringify(body));
 
     const supabase = getServiceSupabase();
 
