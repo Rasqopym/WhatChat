@@ -140,10 +140,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         if (res.ok && data.business) {
           onUpdateBusinesses([...businesses, data.business]);
         } else {
-          onUpdateBusinesses([...businesses, { id: `biz-${Date.now()}`, ...payload }]);
+          onUpdateBusinesses([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
         }
       } catch {
-        onUpdateBusinesses([...businesses, { id: `biz-${Date.now()}`, ...payload }]);
+        onUpdateBusinesses([...businesses, { ...payload, id: `biz-${Date.now()}` }]);
       }
     }
 
