@@ -75,6 +75,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     type: MessageMediaType;
   } | null>(null);
 
+  // Image Lightbox State
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -372,11 +375,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 {/* Media: Image Attachment */}
                 {msg.media_type === 'image' && msg.media_url && (
-                  <div className="mb-2 rounded-lg overflow-hidden border border-black/10">
+                  <div
+                    onClick={() => setLightboxUrl(msg.media_url!)}
+                    className="mb-2 rounded-lg overflow-hidden border border-black/10 cursor-pointer group relative"
+                    title="Click to view full size"
+                  >
                     <img
                       src={msg.media_url}
                       alt="Attachment"
-                      className="max-h-60 w-full object-cover"
+                      className="max-h-60 w-full object-cover group-hover:opacity-95 transition-opacity"
                     />
                   </div>
                 )}
@@ -650,6 +657,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* 7. Full-Screen Image Lightbox Modal */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-end w-full space-x-2 mb-3">
+              <a
+                href={lightboxUrl}
+                download="whatsapp-image"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 backdrop-blur-md"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download</span>
+              </a>
+              <button
+                onClick={() => setLightboxUrl(null)}
+                className="p-1.5 bg-white/15 hover:bg-white/25 text-white rounded-lg backdrop-blur-md cursor-pointer"
+                aria-label="Close image preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={lightboxUrl}
+              alt="Full size preview"
+              className="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain"
+            />
+          </div>
         </div>
       )}
     </main>
