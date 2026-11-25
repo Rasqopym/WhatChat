@@ -124,9 +124,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         });
         const data = await res.json();
         const updatedBiz = res.ok && data.business ? data.business : { ...payload, id: editingBizId };
-        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...updatedBiz } : b)));
+        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...updatedBiz, id: editingBizId } : b)));
       } catch {
-        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload } : b)));
+        onUpdateBusinesses(businesses.map((b) => (b.id === editingBizId ? { ...b, ...payload, id: editingBizId } : b)));
       }
     } else {
       // Create new business
