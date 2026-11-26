@@ -59,6 +59,7 @@ export default function WhatsAppMultiAgentApp() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const isFirstSyncRef = useRef<boolean>(true);
+  const slaAlertedIdsRef = useRef<Set<string>>(new Set());
 
   // Inbox & Real-time State
   const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
@@ -127,6 +128,36 @@ export default function WhatsAppMultiAgentApp() {
           : 'WhatChat — Multi-Business WhatsApp Inbox';
     }
   }, [totalUnreadCount]);
+
+  // SLA Escalation Watcher: alert Admins if an open customer chat waits >15 mins without reply
+  useEffect(() => {
+    if (currentAgent.role !== 'admin') return;
+
+    const checkSla = () => {
+      const now = Date.now();
+      conversations.forEach((conv) => {
+        if (conv.status !== 'open' || conv.id.startsWith('conv-')) return;
+        const msgs = messagesMap[conv.id] || [];
+        const lastMsg = msgs[msgs.length - 1];
+        const awaitingReply = lastMsg ? lastMsg.sender_type === 'customer' : conv.unread_count > 0;
+        if (!awaitingReply) return;
+
+        const waitMins = Math.floor((now - new Date(conv.last_message_at).getTime()) / 60000);
+        if (waitMins >= 15 && !slaAlertedIdsRef.current.has(conv.id)) {
+          slaAlertedIdsRef.current.add(conv.id);
+          const label = conv.contact?.name || conv.contact?.phone_number || 'Customer';
+          showIncomingNotification({
+            title: `⚠️ SLA Alert: ${label}`,
+            body: `Customer has been waiting ${waitMins}m for a reply!`,
+            conversationId: conv.id,
+          });
+        }
+      });
+    };
+
+    const interval = setInterval(checkSla, 60000);
+    return () => clearInterval(interval);
+  }, [conversations, messagesMap, currentAgent.role]);
 
   // Fetch live conversations, businesses & messages from Supabase via /api/inbox
   const syncLiveInbox = async () => {
@@ -498,6 +529,7 @@ export default function WhatsAppMultiAgentApp() {
           <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} w-full md:w-auto h-full`}>
             <ConversationList
               conversations={conversations}
+              messagesMap={messagesMap}
               selectedId={selectedId}
               currentAgent={currentAgent}
               agents={agents}

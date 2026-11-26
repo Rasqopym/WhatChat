@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Conversation, Agent, Business } from '@/types';
-import { Search, UserCheck, AlertCircle, Inbox, Building2, MessageSquarePlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Conversation, Agent, Business, Message } from '@/types';
+import { Search, UserCheck, AlertCircle, Inbox, Building2, MessageSquarePlus, Clock } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: Conversation[];
+  messagesMap?: Record<string, Message[]>;
   selectedId: string | null;
   currentAgent: Agent;
   agents: Agent[];
@@ -20,6 +21,7 @@ type FilterTab = 'all' | 'mine' | 'unassigned' | 'urgent';
 
 export const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
+  messagesMap,
   selectedId,
   currentAgent,
   agents,
@@ -31,6 +33,13 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  // Update SLA timers every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Only show businesses this agent is allowed to access (Admins see all)
   const allowedBusinesses =
@@ -177,6 +186,21 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             const assignedName = getAgentName(conv.assigned_agent_id);
             const biz = getBusiness(conv.business_id);
 
+            // Compute SLA wait time if open and waiting on customer's message
+            const convMsgs = messagesMap?.[conv.id] || [];
+            const lastMsg = convMsgs[convMsgs.length - 1];
+            const awaitingReply =
+              conv.status === 'open' && (lastMsg ? lastMsg.sender_type === 'customer' : conv.unread_count > 0);
+            const waitMins = awaitingReply
+              ? Math.max(0, Math.floor((nowMs - new Date(conv.last_message_at).getTime()) / 60000))
+              : null;
+            const slaLabel =
+              waitMins === null
+                ? null
+                : waitMins >= 60
+                ? `${Math.floor(waitMins / 60)}h ${waitMins % 60}m`
+                : `${waitMins}m`;
+
             return (
               <div
                 key={conv.id}
@@ -243,12 +267,30 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                       )}
                     </div>
 
-                    {/* Unread Counter Badge */}
-                    {conv.unread_count > 0 && (
-                      <span className="min-w-[20px] h-5 px-1.5 bg-[#25D366] text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                        {conv.unread_count}
-                      </span>
-                    )}
+                    {/* SLA Timer + Unread Counter Badge */}
+                    <div className="flex items-center space-x-1.5 flex-shrink-0">
+                      {slaLabel !== null && waitMins !== null && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
+                            waitMins >= 15
+                              ? 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse'
+                              : waitMins >= 5
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                          title={`Customer waiting ${slaLabel} for a reply`}
+                        >
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{slaLabel}</span>
+                        </span>
+                      )}
+
+                      {conv.unread_count > 0 && (
+                        <span className="min-w-[20px] h-5 px-1.5 bg-[#25D366] text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                          {conv.unread_count}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
