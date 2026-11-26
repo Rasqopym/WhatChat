@@ -22,7 +22,8 @@ import {
   X,
   ArrowLeft,
   Info,
-  LayoutTemplate
+  LayoutTemplate,
+  Bot
 } from 'lucide-react';
 
 interface ChatAreaProps {
@@ -200,7 +201,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setIsRecording(false);
     setIsSending(true);
     try {
-      await onSendMessage(`🎤 Voice message (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})`, {
+      await onSendMessage(`Voice message (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})`, {
         type: 'audio',
         url: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
         duration: duration,
@@ -323,9 +324,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             onChange={(e) => onStatusChange(e.target.value as any)}
             className="text-xs font-semibold px-2 md:px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
           >
-            <option value="open">🟢 Open</option>
-            <option value="pending">🟡 Pending</option>
-            <option value="closed">⚪ Closed</option>
+            <option value="open">Open</option>
+            <option value="pending">Pending</option>
+            <option value="closed">Closed</option>
           </select>
 
           {onOpenDetailsMobile && (
@@ -378,7 +379,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       msg.sender_type === 'bot' ? 'text-purple-700' : 'text-emerald-800'
                     }`}
                   >
-                    {msg.sender_type === 'bot' ? '🤖 AI Auto-Responder' : msg.sender_name || 'Agent'}
+                    {msg.sender_type === 'bot' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Bot className="w-3.5 h-3.5" /> AI Auto-Responder
+                      </span>
+                    ) : (
+                      msg.sender_name || 'Agent'
+                    )}
                   </div>
                 )}
 
@@ -504,7 +511,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="absolute bottom-20 left-4 right-4 md:left-6 md:right-96 bg-white rounded-xl shadow-xl border border-slate-200 p-3.5 z-30 animate-fade-in">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Canned Quick Replies</span>
-            <button onClick={() => setShowCanned(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            <button onClick={() => setShowCanned(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Close canned replies">
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {cannedResponses.map((c) => (

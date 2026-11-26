@@ -186,7 +186,7 @@ export default function WhatsAppMultiAgentApp() {
           slaAlertedIdsRef.current.add(conv.id);
           const label = conv.contact?.name || conv.contact?.phone_number || 'Customer';
           showIncomingNotification({
-            title: `⚠️ SLA Alert: ${label}`,
+            title: `SLA Alert: ${label}`,
             body: `Customer has been waiting ${waitMins}m for a reply!`,
             conversationId: conv.id,
           });
@@ -310,7 +310,7 @@ export default function WhatsAppMultiAgentApp() {
     if (perm === 'granted') {
       playNotificationChime();
       showIncomingNotification({
-        title: 'WhatChat Alerts Enabled 🔔',
+        title: 'WhatChat Alerts Enabled',
         body: 'You will now receive instant notifications for new WhatsApp messages.',
         conversationId: selectedId || 'conv-1',
       });
@@ -352,7 +352,7 @@ export default function WhatsAppMultiAgentApp() {
         c.id === selectedConv.id
           ? {
               ...c,
-              last_message_text: media?.type === 'audio' ? '🎤 Voice message' : media?.type === 'image' ? '📷 Photo' : media?.type === 'video' ? '🎥 Video' : media?.type === 'document' ? `📄 ${media.name}` : text,
+              last_message_text: media?.type === 'audio' ? 'Voice message' : media?.type === 'image' ? 'Photo' : media?.type === 'video' ? 'Video' : media?.type === 'document' ? `Document: ${media.name}` : text,
               last_message_at: new Date().toISOString(),
               unread_count: 0,
             }

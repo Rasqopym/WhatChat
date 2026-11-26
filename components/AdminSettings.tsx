@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   Building2,
   Trash2,
-  Pencil
+  Pencil,
+  Shield,
+  ShieldCheck
 } from 'lucide-react';
 
 interface AdminSettingsProps {
@@ -333,8 +335,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               <Settings className="w-6 h-6 text-[#128C7E]" />
               <span>Admin & Multi-Device Control Center</span>
             </h1>
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-              🛡️ Admin Privileges Active
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Admin Privileges Active</span>
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
@@ -381,9 +384,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   <div className="flex items-center justify-between">
                     <span
                       style={{ backgroundColor: `${biz.brand_color}18`, color: biz.brand_color }}
-                      className="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full"
                     >
-                      ● {biz.name}
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: biz.brand_color }}
+                      />
+                      <span>{biz.name}</span>
                     </span>
                     <div className="flex items-center space-x-1">
                       <button
@@ -603,13 +610,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   <button
                     type="button"
                     onClick={() => handleToggleAgentRole(agent.id)}
-                    className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
                       agent.role === 'admin'
                         ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    Role: {agent.role === 'admin' ? '🛡️ Administrator' : 'Support Agent'}
+                    <span>Role:</span>
+                    {agent.role === 'admin' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>Administrator</span>
+                      </span>
+                    ) : (
+                      <span>Support Agent</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -649,7 +664,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             ) : saveSuccess ? (
               <>
                 <Check className="w-4 h-4" />
-                <span>✓ Saved & Activated!</span>
+                <span>Saved & Activated!</span>
               </>
             ) : (
               <>

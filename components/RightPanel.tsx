@@ -14,7 +14,8 @@ import {
   Loader2,
   Shield,
   User,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 
 interface RightPanelProps {
@@ -149,10 +150,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 onChange={(e) => onAssignAgent(e.target.value ? e.target.value : null)}
                 className="w-full text-sm rounded-lg border border-slate-300 p-2 bg-slate-50 text-slate-800 font-medium focus:ring-2 focus:ring-[#128C7E] focus:outline-none cursor-pointer"
               >
-                <option value="">⚪ Unassigned (In Public Queue)</option>
+                <option value="">Unassigned (In Public Queue)</option>
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.is_online ? '🟢' : '⚪'} {agent.name} ({agent.role === 'admin' ? 'Admin' : 'Agent'})
+                    {agent.name} ({agent.role === 'admin' ? 'Admin' : 'Agent'}) — {agent.is_online ? 'Online' : 'Offline'}
                   </option>
                 ))}
               </select>
@@ -273,7 +274,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         {activeTab === 'notes' && (
           <div className="space-y-4">
             <div className="bg-amber-50 text-amber-900 border border-amber-200/80 p-2.5 rounded-lg text-xs">
-              🔒 <strong>Private Team Notes:</strong> Messages posted here are only visible to your 10 agents, never sent to the customer.
+              <Lock className="w-3.5 h-3.5 inline mr-1 -mt-0.5 text-amber-700" />
+              <strong>Private Team Notes:</strong> Messages posted here are only visible to your 10 agents, never sent to the customer.
             </div>
 
             {/* New Note Form */}

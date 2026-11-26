@@ -13,7 +13,10 @@ import {
   AlertCircle,
   UserCheck,
   Award,
-  ArrowRight
+  ArrowRight,
+  User,
+  Shield,
+  Zap
 } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
@@ -52,8 +55,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <div>
             <div className="flex items-center space-x-2.5">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Agent Workstation</h1>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                👤 Personal Agent Metrics
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <User className="w-3.5 h-3.5" />
+                <span>Personal Agent Metrics</span>
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-1">
@@ -187,8 +191,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         <div>
           <div className="flex items-center space-x-2.5">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Company Operations Dashboard</h1>
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-              🛡️ Admin View: All 10 Devices
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+              <Shield className="w-3.5 h-3.5" />
+              <span>Admin View: All 10 Devices</span>
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
@@ -237,7 +242,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <div>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg First Response</div>
             <div className="text-2xl font-bold text-slate-900 mt-0.5">1m 32s</div>
-            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">⚡ 45% faster with AI drafts</div>
+            <div className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
+              <Zap className="w-3 h-3" />
+              <span>45% faster with AI drafts</span>
+            </div>
           </div>
         </div>
 
@@ -296,13 +304,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     </td>
                     <td className="py-3.5 px-4">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                           agent.role === 'admin'
                             ? 'bg-purple-100 text-purple-800'
                             : 'bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {agent.role === 'admin' ? '🛡️ Administrator' : 'Support Specialist'}
+                        {agent.role === 'admin' ? (
+                          <>
+                            <Shield className="w-3 h-3" />
+                            <span>Administrator</span>
+                          </>
+                        ) : (
+                          'Support Specialist'
+                        )}
                       </span>
                     </td>
                     <td className="py-3.5 px-4">

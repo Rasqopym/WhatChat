@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
           contact_id: contact.id,
           status: 'open',
           priority: 'normal',
-          last_message_text: `📋 Template: ${templateName}`,
+          last_message_text: `Template: ${templateName}`,
           unread_count: 0,
         };
         if (validBizId) convPayload.business_id = validBizId;
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
     });
 
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
-    const storedText = previewText || `📋 Template: ${templateName}`;
+    const storedText = previewText || `Template: ${templateName}`;
 
     const { data: message, error: msgError } = await supabase
       .from('messages')

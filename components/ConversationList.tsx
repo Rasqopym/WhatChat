@@ -102,10 +102,10 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               onChange={(e) => onSelectBusiness(e.target.value)}
               className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer truncate"
             >
-              <option value="all">🏢 All Businesses ({allowedBusinesses.length})</option>
+              <option value="all">All Businesses ({allowedBusinesses.length})</option>
               {allowedBusinesses.map((biz) => (
                 <option key={biz.id} value={biz.id}>
-                  ● {biz.name} ({biz.display_phone_number})
+                  {biz.name} ({biz.display_phone_number})
                 </option>
               ))}
             </select>

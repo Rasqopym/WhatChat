@@ -178,20 +178,20 @@ export async function POST(req: NextRequest) {
       } else if (messageType === 'image') {
         inboundMediaType = 'image';
         inboundMediaUrl = buildMediaProxyUrl(incoming.image?.id);
-        messageText = incoming.image?.caption || '📷 Photo';
+        messageText = incoming.image?.caption || 'Photo';
       } else if (messageType === 'video') {
         inboundMediaType = 'video';
         inboundMediaUrl = buildMediaProxyUrl(incoming.video?.id);
-        messageText = incoming.video?.caption || '🎥 Video';
+        messageText = incoming.video?.caption || 'Video';
       } else if (messageType === 'audio') {
         inboundMediaType = 'audio';
         inboundMediaUrl = buildMediaProxyUrl(incoming.audio?.id);
-        messageText = '🎤 Voice message';
+        messageText = 'Voice message';
       } else if (messageType === 'document') {
         inboundMediaType = 'document';
         const docName = incoming.document?.filename || 'Document';
         inboundMediaUrl = buildMediaProxyUrl(incoming.document?.id, docName);
-        messageText = incoming.document?.caption ? `${docName} — ${incoming.document.caption}` : `📄 ${docName}`;
+        messageText = incoming.document?.caption ? `${docName} — ${incoming.document.caption}` : `Document: ${docName}`;
       } else {
         messageText = `[${messageType} message]`;
       }

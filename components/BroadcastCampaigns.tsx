@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Lock,
   LayoutTemplate,
+  Shield,
 } from 'lucide-react';
 
 interface BroadcastCampaignsProps {
@@ -179,8 +180,9 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
             Send approved WhatsApp Template announcements to segmented customer labels
           </p>
         </div>
-        <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200 self-start">
-          🛡️ Admin Only
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200 self-start">
+          <Shield className="w-3.5 h-3.5" />
+          <span>Admin Only</span>
         </span>
       </div>
 
@@ -205,7 +207,7 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
                   onChange={(e) => setSelectedBusinessId(e.target.value)}
                   className="w-full text-sm p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
                 >
-                  <option value="all">🏢 All Businesses</option>
+                  <option value="all">All Businesses</option>
                   {businesses.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name} ({b.display_phone_number})
@@ -227,7 +229,7 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
                   <option value="ALL">All Contacts</option>
                   {availableTags.map((tag) => (
                     <option key={tag} value={tag}>
-                      🏷️ {tag}
+                      {tag}
                     </option>
                   ))}
                 </select>

@@ -76,13 +76,13 @@ export async function POST(req: NextRequest) {
     const safeMediaUrl = media?.url && !media.url.startsWith('data:') ? media.url : null;
     const mediaLabel =
       media?.type === 'image'
-        ? `📷 Photo: ${media.name || 'image'}`
+        ? `Photo: ${media.name || 'image'}`
         : media?.type === 'video'
-        ? `🎥 Video: ${media.name || 'video'}`
+        ? `Video: ${media.name || 'video'}`
         : media?.type === 'audio'
-        ? '🎤 Voice message'
+        ? 'Voice message'
         : media?.type === 'document'
-        ? `📄 Document: ${media.name || 'file'}`
+        ? `Document: ${media.name || 'file'}`
         : '';
     const storedText = media ? (text ? `${mediaLabel}\n${text}` : mediaLabel) : text;
 
@@ -108,13 +108,13 @@ export async function POST(req: NextRequest) {
 
     // 4. Update conversation: clear unread count, set last message
     const snippet = media?.type === 'audio' 
-      ? '🎤 Voice message' 
+      ? 'Voice message' 
       : media?.type === 'image' 
-      ? '📷 Photo' 
+      ? 'Photo' 
       : media?.type === 'video'
-      ? '🎥 Video'
+      ? 'Video'
       : media?.type === 'document' 
-      ? `📄 ${media.name}` 
+      ? `Document: ${media.name}` 
       : text;
 
     await supabase

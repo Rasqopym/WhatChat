@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Dispatch template to each recipient sequentially
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
-    const storedText = previewText || `📢 Broadcast Template: ${templateName}`;
+    const storedText = previewText || `Broadcast Template: ${templateName}`;
     const results: Array<{ phone: string; name: string; status: 'sent' | 'failed'; error?: string }> = [];
 
     for (const recipient of recipients) {
