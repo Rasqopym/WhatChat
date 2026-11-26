@@ -20,7 +20,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/auth/status', { cache: 'no-store' })
+    fetch(`/api/auth/status?t=${Date.now()}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.hasAgents === false) {
@@ -45,7 +45,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           body: JSON.stringify({ name, email, password }),
         });
         const setupData = await setupRes.json();
-        if (!setupRes.ok) {
+        if (setupRes.status === 403) {
+          // Admin already exists: switch to Sign In mode and continue signing in!
+          setNeedsInitialSetup(false);
+        } else if (!setupRes.ok) {
           setErrorMsg(setupData.error || 'Failed to create Admin account');
           setIsSubmitting(false);
           return;
@@ -200,6 +203,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             )}
           </button>
         </form>
+
+        {needsInitialSetup && (
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setNeedsInitialSetup(false);
+                setErrorMsg(null);
+              }}
+              className="text-xs text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+            >
+              Already have an account? Sign In instead
+            </button>
+          </div>
+        )}
 
         <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
           <div className="flex items-center justify-center space-x-1.5 text-xs text-slate-400">
