@@ -9,10 +9,11 @@ import {
   LogOut, 
   Lock,
   Bell,
-  BellOff
+  BellOff,
+  Megaphone
 } from 'lucide-react';
 
-export type ActiveView = 'inbox' | 'dashboard' | 'settings';
+export type ActiveView = 'inbox' | 'dashboard' | 'broadcasts' | 'settings';
 
 interface SidebarNavProps {
   activeView: ActiveView;
@@ -81,6 +82,23 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               title={isAdmin ? 'Company Dashboard (Admin)' : 'My Performance Stats (Agent)'}
             >
               <LayoutDashboard className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => onSelectView('broadcasts')}
+              className={`w-11 h-11 rounded-xl flex items-center justify-center relative transition-all cursor-pointer ${
+                activeView === 'broadcasts'
+                  ? 'bg-slate-700/80 text-white shadow-inner'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title={isAdmin ? 'Broadcast Campaigns (Admin)' : 'Broadcasts (Admin Only)'}
+            >
+              <Megaphone className="w-5 h-5" />
+              {!isAdmin && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500/90 text-slate-950 text-[9px] font-bold rounded-full flex items-center justify-center shadow">
+                  <Lock className="w-2.5 h-2.5" />
+                </span>
+              )}
             </button>
 
             <button
@@ -170,12 +188,22 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
           <button
             onClick={() => onSelectView('dashboard')}
-            className={`flex flex-col items-center justify-center space-y-0.5 px-3 py-1 rounded-xl ${
+            className={`flex flex-col items-center justify-center space-y-0.5 px-2.5 py-1 rounded-xl ${
               activeView === 'dashboard' ? 'text-[#25D366]' : 'text-slate-400'
             }`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span className="text-[10px] font-semibold">Stats</span>
+          </button>
+
+          <button
+            onClick={() => onSelectView('broadcasts')}
+            className={`flex flex-col items-center justify-center space-y-0.5 px-2.5 py-1 rounded-xl ${
+              activeView === 'broadcasts' ? 'text-[#25D366]' : 'text-slate-400'
+            }`}
+          >
+            <Megaphone className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">Campaign</span>
           </button>
 
           <button

@@ -9,6 +9,7 @@ import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { AdminSettings } from '@/components/AdminSettings';
 import { LoginPage } from '@/components/LoginPage';
 import { TemplateModal } from '@/components/TemplateModal';
+import { BroadcastCampaigns } from '@/components/BroadcastCampaigns';
 import {
   MOCK_AGENTS,
   MOCK_BUSINESSES,
@@ -584,6 +585,16 @@ export default function WhatsAppMultiAgentApp() {
             setActiveView('inbox');
             setMobileShowChat(true);
           }}
+        />
+      )}
+
+      {/* Label-Based Broadcast Campaigns View (Admin Only) */}
+      {activeView === 'broadcasts' && (
+        <BroadcastCampaigns
+          agents={agents}
+          businesses={businesses}
+          conversations={conversations}
+          currentAgent={currentAgent}
         />
       )}
 
