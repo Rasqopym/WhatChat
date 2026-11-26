@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Agent, Conversation } from '@/types';
+import React, { useMemo } from 'react';
+import { Agent, Conversation, Message } from '@/types';
 import { 
   Users, 
   MessageSquare, 
@@ -22,13 +22,23 @@ import {
 interface AnalyticsDashboardProps {
   agents: Agent[];
   conversations: Conversation[];
+  messagesMap?: Record<string, Message[]>;
   currentAgent: Agent;
   onOpenConversation?: (convId: string) => void;
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms)) return '—';
+  const totalSecs = Math.max(0, Math.round(ms / 1000));
+  if (totalSecs < 60) return `${totalSecs}s`;
+  if (totalSecs < 3600) return `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s`;
+  return `${Math.floor(totalSecs / 3600)}h ${Math.floor((totalSecs % 3600) / 60)}m`;
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   agents,
   conversations,
+  messagesMap = {},
   currentAgent,
   onOpenConversation,
 }) => {
@@ -43,6 +53,98 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   // Calculations for Individual Support Agent View
   const myAssignedChats = conversations.filter((c) => c.assigned_agent_id === currentAgent.id);
   const myUrgentChats = myAssignedChats.filter((c) => c.priority === 'urgent');
+
+  // Real response-time & handled calculations derived from actual messages
+  const {
+    overallAvgFirstResponseMs,
+    respondedConversationsCount,
+    botReplyCount,
+    agentStatsMap,
+  } = useMemo(() => {
+    const firstResponseDiffs: number[] = [];
+    let botCount = 0;
+    const perAgentResponseDiffs: Record<string, number[]> = {};
+    const perAgentHandledSet: Record<string, Set<string>> = {};
+
+    for (const agent of agents) {
+      perAgentResponseDiffs[agent.id] = [];
+      perAgentHandledSet[agent.id] = new Set();
+    }
+
+    for (const conv of conversations) {
+      if (conv.assigned_agent_id && conv.status === 'closed') {
+        if (!perAgentHandledSet[conv.assigned_agent_id]) {
+          perAgentHandledSet[conv.assigned_agent_id] = new Set();
+        }
+        perAgentHandledSet[conv.assigned_agent_id].add(conv.id);
+      }
+
+      const msgs = [...(messagesMap[conv.id] || [])].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      let firstCustomerAt: number | null = null;
+      let recordedFirstReply = false;
+      let pendingCustomerAt: number | null = null;
+
+      for (const msg of msgs) {
+        const ts = new Date(msg.created_at).getTime();
+        if (msg.sender_type === 'bot') {
+          botCount += 1;
+        }
+
+        if (msg.sender_type === 'customer') {
+          if (firstCustomerAt === null) firstCustomerAt = ts;
+          if (pendingCustomerAt === null) pendingCustomerAt = ts;
+        } else if (msg.sender_type === 'agent' || msg.sender_type === 'bot') {
+          if (!recordedFirstReply && firstCustomerAt !== null && ts >= firstCustomerAt) {
+            firstResponseDiffs.push(ts - firstCustomerAt);
+            recordedFirstReply = true;
+          }
+
+          if (msg.sender_type === 'agent' && msg.sender_id) {
+            if (!perAgentHandledSet[msg.sender_id]) {
+              perAgentHandledSet[msg.sender_id] = new Set();
+            }
+            perAgentHandledSet[msg.sender_id].add(conv.id);
+
+            if (pendingCustomerAt !== null && ts >= pendingCustomerAt) {
+              if (!perAgentResponseDiffs[msg.sender_id]) {
+                perAgentResponseDiffs[msg.sender_id] = [];
+              }
+              perAgentResponseDiffs[msg.sender_id].push(ts - pendingCustomerAt);
+              pendingCustomerAt = null;
+            }
+          }
+        }
+      }
+    }
+
+    const avgMs =
+      firstResponseDiffs.length > 0
+        ? firstResponseDiffs.reduce((sum, v) => sum + v, 0) / firstResponseDiffs.length
+        : null;
+
+    const statsMap: Record<string, { handledCount: number; avgResponseMs: number | null }> = {};
+    for (const agent of agents) {
+      const diffs = perAgentResponseDiffs[agent.id] || [];
+      statsMap[agent.id] = {
+        handledCount: perAgentHandledSet[agent.id]?.size || 0,
+        avgResponseMs:
+          diffs.length > 0 ? diffs.reduce((sum, v) => sum + v, 0) / diffs.length : null,
+      };
+    }
+
+    return {
+      overallAvgFirstResponseMs: avgMs,
+      respondedConversationsCount: firstResponseDiffs.length,
+      botReplyCount: botCount,
+      agentStatsMap: statsMap,
+    };
+  }, [agents, conversations, messagesMap]);
+
+  const myStats = agentStatsMap[currentAgent.id] || { handledCount: 0, avgResponseMs: null };
+  const myClosedCount = myAssignedChats.filter((c) => c.status === 'closed').length;
 
   // ==========================================
   // 1. SUPPORT AGENT WORKSPACE VIEW
@@ -90,8 +192,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
             <div>
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">My Avg Response</div>
-              <div className="text-2xl font-bold text-slate-900 mt-0.5">{currentAgent.avg_response_time || '1m 20s'}</div>
-              <div className="text-[11px] text-emerald-600 font-medium mt-0.5">Top 15% team speed</div>
+              <div className="text-2xl font-bold text-slate-900 mt-0.5">{formatDuration(myStats.avgResponseMs)}</div>
+              <div className="text-[11px] text-emerald-600 font-medium mt-0.5">Calculated from live replies</div>
             </div>
           </div>
 
@@ -101,8 +203,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
             <div>
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Chats Handled</div>
-              <div className="text-2xl font-bold text-slate-900 mt-0.5">{currentAgent.chats_handled || 76} Resolved</div>
-              <div className="text-[11px] text-sky-600 font-medium mt-0.5">99.1% Positive CSAT</div>
+              <div className="text-2xl font-bold text-slate-900 mt-0.5">{myStats.handledCount} Handled</div>
+              <div className="text-[11px] text-sky-600 font-medium mt-0.5">{myClosedCount} closed · {myAssignedChats.length} assigned</div>
             </div>
           </div>
 
@@ -193,18 +295,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Company Operations Dashboard</h1>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
               <Shield className="w-3.5 h-3.5" />
-              <span>Admin View: All 10 Devices</span>
+              <span>Admin View: {agents.length} {agents.length === 1 ? 'Agent' : 'Agents'}</span>
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time multi-device metrics across all 10 customer service agents and Meta WhatsApp API
+            Real-time multi-device metrics across {agents.length} active customer service {agents.length === 1 ? 'account' : 'accounts'} and Meta WhatsApp API
           </p>
         </div>
 
         {/* Live Device Status */}
         <div className="flex items-center space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-semibold">
           <Smartphone className="w-4 h-4 text-emerald-600" />
-          <span>10 Device Slots Active & Synced</span>
+          <span>{onlineAgents} of {agents.length} Online & Synced</span>
         </div>
       </div>
 
@@ -230,7 +332,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <div>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Team Capacity</div>
             <div className="text-2xl font-bold text-slate-900 mt-0.5">{onlineAgents} / {agents.length} Online</div>
-            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">All 10 agent licenses active</div>
+            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">{agents.length} {agents.length === 1 ? 'agent account' : 'agent accounts'} configured</div>
           </div>
         </div>
 
@@ -241,10 +343,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
           <div>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg First Response</div>
-            <div className="text-2xl font-bold text-slate-900 mt-0.5">1m 32s</div>
+            <div className="text-2xl font-bold text-slate-900 mt-0.5">{formatDuration(overallAvgFirstResponseMs)}</div>
             <div className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
               <Zap className="w-3 h-3" />
-              <span>45% faster with AI drafts</span>
+              <span>{respondedConversationsCount} of {conversations.length} chats replied</span>
             </div>
           </div>
         </div>
@@ -266,8 +368,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">10-Agent Team Performance & Workload</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Real-time status and ticket assignments per device</p>
+            <h2 className="text-base font-bold text-slate-900">Team Performance & Workload ({agents.length})</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Real-time status, ticket assignments, and response times per agent</p>
           </div>
           <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-medium">
             Updated in Real-Time
@@ -289,6 +391,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {agents.map((agent) => {
                 const assignedCount = conversations.filter((c) => c.assigned_agent_id === agent.id).length;
+                const stats = agentStatsMap[agent.id] || { handledCount: 0, avgResponseMs: null };
                 return (
                   <tr key={agent.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900 flex items-center space-x-3">
@@ -331,11 +434,13 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       </span>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-900">
-                      {assignedCount} chats
+                      {assignedCount} {assignedCount === 1 ? 'chat' : 'chats'}
                     </td>
-                    <td className="py-3.5 px-4 font-medium">{agent.chats_handled || 40} chats</td>
+                    <td className="py-3.5 px-4 font-medium">
+                      {stats.handledCount} {stats.handledCount === 1 ? 'chat' : 'chats'}
+                    </td>
                     <td className="py-3.5 px-4 text-emerald-700 font-semibold">
-                      {agent.avg_response_time || '1m 40s'}
+                      {formatDuration(stats.avgResponseMs)}
                     </td>
                   </tr>
                 );
@@ -353,7 +458,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
           <div>
             <div className="text-xs font-bold text-slate-800">WhatsApp Cloud API</div>
-            <div className="text-[11px] text-slate-500">Webhook Status: Healthy & Subscribed</div>
+            <div className="text-[11px] text-slate-500">{conversations.length} conversations synced live</div>
           </div>
         </div>
 
@@ -363,7 +468,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
           <div>
             <div className="text-xs font-bold text-slate-800">Supabase Multi-Device Sync</div>
-            <div className="text-[11px] text-slate-500">10 Concurrent WebSocket streams</div>
+            <div className="text-[11px] text-slate-500">{onlineAgents} active {onlineAgents === 1 ? 'session' : 'sessions'} online</div>
           </div>
         </div>
 
@@ -373,7 +478,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
           <div>
             <div className="text-xs font-bold text-slate-800">Google Gemini Flash AI</div>
-            <div className="text-[11px] text-slate-500">Auto-triage & drafting operational</div>
+            <div className="text-[11px] text-slate-500">{botReplyCount} AI auto-{botReplyCount === 1 ? 'reply' : 'replies'} sent</div>
           </div>
         </div>
       </div>

@@ -672,6 +672,7 @@ export default function WhatsAppMultiAgentApp() {
         <AnalyticsDashboard
           agents={agents}
           conversations={conversations}
+          messagesMap={messagesMap}
           currentAgent={currentAgent}
           onOpenConversation={(convId) => {
             setSelectedId(convId);
