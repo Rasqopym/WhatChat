@@ -65,6 +65,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   // New Agent Modal Form
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentEmail, setNewAgentEmail] = useState('');
+  const [newAgentPassword, setNewAgentPassword] = useState('');
   const [newAgentRole, setNewAgentRole] = useState<'admin' | 'agent'>('agent');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -227,32 +228,56 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  const handleAddAgent = (e: React.FormEvent) => {
+  const handleAddAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin || !newAgentName.trim() || !newAgentEmail.trim()) return;
+    if (!isAdmin || !newAgentName.trim() || !newAgentEmail.trim() || newAgentPassword.length < 6) return;
 
-    const newAgent: Agent = {
-      id: `agent-${Date.now()}`,
-      name: newAgentName.trim(),
-      email: newAgentEmail.trim(),
-      role: newAgentRole,
-      is_online: true,
-      chats_handled: 0,
-      avg_response_time: '0m',
-      avatar_url: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?w=100`,
-    };
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newAgentName.trim(),
+          email: newAgentEmail.trim(),
+          password: newAgentPassword,
+          role: newAgentRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Failed to create agent: ${data.error || 'Unknown error'}`);
+        return;
+      }
 
-    onUpdateAgents([...agents, newAgent]);
-    setNewAgentName('');
-    setNewAgentEmail('');
-    setShowAddModal(false);
+      if (data.agent) {
+        onUpdateAgents([...agents, data.agent]);
+      }
+      setNewAgentName('');
+      setNewAgentEmail('');
+      setNewAgentPassword('');
+      setShowAddModal(false);
+    } catch (err: any) {
+      alert(`Error creating agent: ${err.message}`);
+    }
   };
 
-  const handleToggleAgentRole = (agentId: string) => {
+  const handleToggleAgentRole = async (agentId: string) => {
     if (!isAdmin) return;
+    const target = agents.find((a) => a.id === agentId);
+    if (!target) return;
+    const nextRole = target.role === 'admin' ? 'agent' : 'admin';
+
     onUpdateAgents(
-      agents.map((a) => (a.id === agentId ? { ...a, role: a.role === 'admin' ? 'agent' : 'admin' } : a))
+      agents.map((a) => (a.id === agentId ? { ...a, role: nextRole } : a))
     );
+
+    try {
+      await fetch('/api/agents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, role: nextRole }),
+      });
+    } catch {}
   };
 
   // ACCESS DENIED VIEW FOR REGULAR SUPPORT AGENTS
@@ -292,16 +317,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               <span><strong>Administrators:</strong> Manage Meta Cloud API keys, Webhooks, AI model settings, and invite/promote team members.</span>
             </div>
           </div>
-
-          {onSwitchAgent && (
-            <button
-              onClick={() => onSwitchAgent(adminAgent)}
-              className="w-full py-3 bg-[#075E54] hover:bg-[#128C7E] text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-[#075E54]/20 transition-all cursor-pointer"
-            >
-              <span>Switch to Admin Account ({adminAgent.name})</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
     );
@@ -673,6 +688,19 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   value={newAgentEmail}
                   onChange={(e) => setNewAgentEmail(e.target.value)}
                   placeholder="alex@business.com"
+                  className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">Password (min 6 chars)</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newAgentPassword}
+                  onChange={(e) => setNewAgentPassword(e.target.value)}
+                  placeholder="••••••••"
                   className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
                 />
               </div>

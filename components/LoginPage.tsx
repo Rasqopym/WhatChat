@@ -1,70 +1,156 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Agent } from '@/types';
-import { MessageSquare, Lock, Mail, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { MessageSquare, Lock, Mail, ShieldCheck, ArrowRight, User, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
-  agents: Agent[];
-  onLogin: (agent: Agent) => void;
+  onLoginSuccess: (agent: Agent) => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ agents, onLogin }) => {
-  const [selectedAgentId, setSelectedAgentId] = useState(agents[0].id);
-  const [email, setEmail] = useState(agents[0].email);
-  const [password, setPassword] = useState('password123');
+export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+  const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
 
-  const handleSelectAgent = (agentId: string) => {
-    setSelectedAgentId(agentId);
-    const ag = agents.find((a) => a.id === agentId);
-    if (ag) {
-      setEmail(ag.email);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/status', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.hasAgents === false) {
+          setNeedsInitialSetup(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsCheckingSetup(false));
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setIsSubmitting(true);
+
+    try {
+      if (needsInitialSetup) {
+        // 1. Bootstrap First Admin Account
+        const setupRes = await fetch('/api/auth/setup-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const setupData = await setupRes.json();
+        if (!setupRes.ok) {
+          setErrorMsg(setupData.error || 'Failed to create Admin account');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // 2. Sign in with Supabase Auth
+      const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (signInErr || !authData.user) {
+        setErrorMsg(signInErr?.message || 'Invalid email or password');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 3. Fetch agent profile
+      const agentsRes = await fetch('/api/agents', { cache: 'no-store' });
+      const agentsData = await agentsRes.json();
+      const matchedAgent = (agentsData.agents || []).find((a: Agent) => a.id === authData.user.id);
+
+      if (matchedAgent) {
+        // Mark agent online
+        fetch('/api/agents', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId: matchedAgent.id, isOnline: true }),
+        }).catch(() => {});
+
+        onLoginSuccess({ ...matchedAgent, is_online: true });
+      } else {
+        onLoginSuccess({
+          id: authData.user.id,
+          email: authData.user.email || email,
+          name: authData.user.user_metadata?.name || email.split('@')[0],
+          role: authData.user.user_metadata?.role === 'admin' ? 'admin' : 'agent',
+          is_online: true,
+        });
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Authentication error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const agent = agents.find((a) => a.id === selectedAgentId) || agents[0];
-    onLogin(agent);
-  };
+  if (isCheckingSetup) {
+    return (
+      <div className="min-h-screen w-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="flex items-center space-x-3 text-sm text-slate-300">
+          <Loader2 className="w-5 h-5 animate-spin text-[#25D366]" />
+          <span>Checking workspace authentication...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-slate-900 px-4 relative overflow-hidden">
-      {/* Background glow effects */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#128C7E]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#25D366]/15 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-md w-full bg-slate-800/90 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl p-8 z-10">
         {/* Brand Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-7">
           <div className="w-14 h-14 bg-[#25D366] rounded-2xl flex items-center justify-center text-white mx-auto shadow-lg shadow-[#25D366]/30 mb-4">
             <MessageSquare className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">WhatsApp Team Inbox</h1>
-          <p className="text-sm text-slate-400 mt-1">Multi-Agent Business Portal • 10 Devices</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            {needsInitialSetup ? 'Create Primary Admin' : 'WhatChat Team Login'}
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            {needsInitialSetup
+              ? 'Set up your first Administrator password to secure your team inbox'
+              : 'Sign in with your team email & password'}
+          </p>
         </div>
 
-        {/* Quick Agent Selector for Instant Testing */}
-        <div className="mb-6 bg-slate-900/70 p-3.5 rounded-xl border border-slate-700">
-          <label className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Select 1 of 10 Team Members to Log in</span>
-          </label>
-          <select
-            value={selectedAgentId}
-            onChange={(e) => handleSelectAgent(e.target.value)}
-            className="w-full bg-slate-800 text-white text-sm font-medium rounded-lg p-2.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#25D366]"
-          >
-            {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name} — {agent.role === 'admin' ? '🛡️ Admin' : '👤 Support Agent'}
-              </option>
-            ))}
-          </select>
-        </div>
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {needsInitialSetup && (
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">Full Name</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Sarah Jenkins"
+                  className="w-full bg-slate-900/60 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-medium text-slate-300 block mb-1">Email Address</label>
             <div className="relative">
@@ -74,6 +160,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ agents, onLogin }) => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
                 className="w-full bg-slate-900/60 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
               />
             </div>
@@ -86,8 +173,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ agents, onLogin }) => {
               <input
                 type="password"
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 className="w-full bg-slate-900/60 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#128C7E]"
               />
             </div>
@@ -95,18 +184,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ agents, onLogin }) => {
 
           <button
             type="submit"
-            className="w-full py-3 bg-[#25D366] hover:bg-[#1ebd5a] text-slate-950 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-[#25D366]/25 mt-6 cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full py-3 bg-[#25D366] hover:bg-[#1ebd5a] text-slate-950 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-[#25D366]/25 mt-6 cursor-pointer disabled:opacity-50"
           >
-            <span>Enter Team Dashboard</span>
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{needsInitialSetup ? 'Creating Admin...' : 'Signing In...'}</span>
+              </>
+            ) : (
+              <>
+                <span>{needsInitialSetup ? 'Create Admin & Enter' : 'Sign In to Inbox'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 
-        {/* Security Footer */}
         <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
           <div className="flex items-center justify-center space-x-1.5 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>End-to-End Encrypted Session & Multi-Device Sync</span>
+            <span>Secured by Supabase Auth & Role-Based Access Control</span>
           </div>
         </div>
       </div>

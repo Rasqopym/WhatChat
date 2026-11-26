@@ -31,7 +31,8 @@ import {
 
 export default function WhatsAppMultiAgentApp() {
   // Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS);
   const [currentAgent, setCurrentAgent] = useState<Agent>(MOCK_AGENTS[0]);
 
@@ -78,10 +79,48 @@ export default function WhatsAppMultiAgentApp() {
     return INITIAL_SETTINGS;
   });
 
-  // Register Service Worker & Check Notification Permission on mount
+  // Check Supabase Auth session + Register Service Worker on mount
   useEffect(() => {
     registerServiceWorker();
     setNotificationPermission(getNotificationPermission());
+
+    const initAuth = async () => {
+      try {
+        const [{ data: sessionData }, agentsRes] = await Promise.all([
+          supabase.auth.getSession(),
+          fetch('/api/agents', { cache: 'no-store' }),
+        ]);
+
+        const agentsJson = await agentsRes.json().catch(() => ({ agents: [] }));
+        const realAgents: Agent[] = agentsJson.agents || [];
+        if (realAgents.length > 0) {
+          setAgents(realAgents);
+        }
+
+        const user = sessionData?.session?.user;
+        if (user) {
+          const matched = realAgents.find((a) => a.id === user.id);
+          if (matched) {
+            setCurrentAgent({ ...matched, is_online: true });
+          } else {
+            setCurrentAgent({
+              id: user.id,
+              email: user.email || '',
+              name: user.user_metadata?.name || user.email?.split('@')[0] || 'Agent',
+              role: user.user_metadata?.role === 'admin' ? 'admin' : 'agent',
+              is_online: true,
+            });
+          }
+          setIsLoggedIn(true);
+        }
+      } catch (err) {
+        console.warn('Auth session check error:', err);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    initAuth();
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('whatsapp_app_settings');
@@ -493,13 +532,27 @@ export default function WhatsAppMultiAgentApp() {
     }
   };
 
+  if (isCheckingAuth) {
+    return (
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-slate-900 text-slate-300 text-sm">
+        Loading WhatChat...
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <LoginPage
-        agents={agents}
-        onLogin={(agent) => {
+        onLoginSuccess={async (agent) => {
           setCurrentAgent(agent);
           setIsLoggedIn(true);
+          try {
+            const res = await fetch('/api/agents', { cache: 'no-store' });
+            const data = await res.json();
+            if (data.agents && data.agents.length > 0) {
+              setAgents(data.agents);
+            }
+          } catch {}
         }}
       />
     );
@@ -518,7 +571,15 @@ export default function WhatsAppMultiAgentApp() {
         unreadCount={totalUnreadCount}
         notificationPermission={notificationPermission}
         onEnableNotifications={handleEnableNotifications}
-        onLogout={() => setIsLoggedIn(false)}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          fetch('/api/agents', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId: currentAgent.id, isOnline: false }),
+          }).catch(() => {});
+          setIsLoggedIn(false);
+        }}
         hideMobileBar={activeView === 'inbox' && mobileShowChat}
       />
 
