@@ -366,13 +366,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 className={`max-w-[82%] md:max-w-[65%] rounded-xl p-3 text-sm shadow-sm relative ${
                   isCustomer
                     ? 'bg-white text-slate-900 rounded-tl-none'
+                    : msg.sender_type === 'bot'
+                    ? 'bg-purple-50 border border-purple-200 text-slate-900 rounded-tr-none'
                     : 'bg-[#DCF8C6] text-slate-900 rounded-tr-none'
                 }`}
               >
-                {/* Agent Attribution */}
+                {/* Agent or AI Bot Attribution */}
                 {!isCustomer && (
-                  <div className="text-[11px] font-semibold text-emerald-800 mb-1">
-                    {msg.sender_name || 'Agent'}
+                  <div
+                    className={`text-[11px] font-semibold mb-1 ${
+                      msg.sender_type === 'bot' ? 'text-purple-700' : 'text-emerald-800'
+                    }`}
+                  >
+                    {msg.sender_type === 'bot' ? '🤖 AI Auto-Responder' : msg.sender_name || 'Agent'}
                   </div>
                 )}
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { markWhatsAppMessageAsRead } from '@/lib/whatsapp';
-import { triageMessage } from '@/lib/ai';
+import { markWhatsAppMessageAsRead, sendWhatsAppTextMessage } from '@/lib/whatsapp';
+import { triageMessage, generateAutoReply } from '@/lib/ai';
 import { activeSettings } from '@/lib/settings-store';
 
 /**
@@ -136,14 +136,25 @@ export async function POST(req: NextRequest) {
 
       // Multi-Business Resolution: look up which business owns this Phone Number ID
       let resolvedBusinessId: string | null = null;
+      let resolvedBusiness: {
+        id: string;
+        name: string;
+        ai_context?: string;
+        whatsapp_phone_number_id?: string;
+        whatsapp_access_token?: string;
+      } | null = null;
+
       if (incomingPhoneNumberId) {
         try {
           const { data: biz } = await supabase
             .from('businesses')
-            .select('id')
+            .select('id, name, ai_context, whatsapp_phone_number_id, whatsapp_access_token')
             .eq('whatsapp_phone_number_id', incomingPhoneNumberId)
             .maybeSingle();
-          if (biz?.id) resolvedBusinessId = biz.id;
+          if (biz?.id) {
+            resolvedBusinessId = biz.id;
+            resolvedBusiness = biz;
+          }
         } catch {
           // Graceful fallback if businesses table hasn't been migrated yet
         }
@@ -268,6 +279,57 @@ export async function POST(req: NextRequest) {
 
         // Mark incoming WhatsApp message as read/acknowledged
         await markWhatsAppMessageAsRead(messageId);
+
+        // Step D: 24/7 AI Auto-Responder (runs only on unassigned, non-escalated text chats when enabled)
+        const autoReplyOn =
+          process.env.AI_AUTO_REPLY_ENABLED === 'true' || activeSettings.autoReplyEnabled;
+        const isUnassigned = !conversation.assigned_agent_id && !conversation.assigned_agent_key;
+
+        if (autoReplyOn && isUnassigned && conversation.priority !== 'urgent' && messageType === 'text' && messageText) {
+          try {
+            const { data: recentMsgs } = await supabase
+              .from('messages')
+              .select('*')
+              .eq('conversation_id', conversation.id)
+              .order('created_at', { ascending: true })
+              .limit(10);
+
+            const { reply, shouldHandoff } = await generateAutoReply({
+              latestMessage: messageText,
+              history: (recentMsgs || []) as any[],
+              contactName: customerName,
+              businessName: resolvedBusiness?.name,
+              businessContext: resolvedBusiness?.ai_context,
+              welcomeFallback: activeSettings.autoReplyMessage || undefined,
+            });
+
+            if (reply) {
+              const sendRes = await sendWhatsAppTextMessage(
+                fromPhone,
+                reply,
+                resolvedBusiness?.whatsapp_phone_number_id || incomingPhoneNumberId,
+                resolvedBusiness?.whatsapp_access_token
+              );
+
+              await supabase.from('messages').insert({
+                conversation_id: conversation.id,
+                sender_type: 'bot',
+                text: reply,
+                status: sendRes.simulated ? 'delivered' : 'sent',
+                whatsapp_message_id: sendRes.messageId || null,
+              });
+
+              if (shouldHandoff) {
+                await supabase
+                  .from('conversations')
+                  .update({ priority: 'urgent', last_message_text: reply })
+                  .eq('id', conversation.id);
+              }
+            }
+          } catch (botErr) {
+            console.warn('[AI Auto-Responder Error]', botErr);
+          }
+        }
       }
     }
 

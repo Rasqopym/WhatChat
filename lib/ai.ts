@@ -1,18 +1,18 @@
 import { Message } from '@/types';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 /**
  * Calls Google Gemini Flash to generate text based on a prompt
  */
 async function callGemini(prompt: string, systemInstruction?: string): Promise<string | null> {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('your_gemini_api_key')) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.includes('your_gemini_api_key')) {
     return null;
   }
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -126,4 +126,68 @@ Only output the JSON object without code blocks or commentary.`;
   const tag = lower.includes('price') || lower.includes('buy') || lower.includes('demo') ? 'Sales' : lower.includes('invoice') || lower.includes('bill') ? 'Billing' : 'Support';
 
   return { priority: isUrgent ? 'urgent' : 'normal', tags: [tag] };
+}
+
+/**
+ * 24/7 AI Auto-Responder with automatic Human Handoff detection
+ */
+export async function generateAutoReply(params: {
+  latestMessage: string;
+  history: Message[];
+  contactName?: string;
+  businessName?: string;
+  businessContext?: string;
+  welcomeFallback?: string;
+}): Promise<{ reply: string; shouldHandoff: boolean }> {
+  const lower = params.latestMessage.toLowerCase();
+
+  // Explicit human handoff triggers
+  const handoffKeywords = [
+    'human',
+    'agent',
+    'representative',
+    'speak to someone',
+    'talk to someone',
+    'manager',
+    'real person',
+    'customer service',
+    'call me',
+    'complaint',
+    'refund',
+  ];
+
+  if (handoffKeywords.some((kw) => lower.includes(kw))) {
+    return {
+      reply: `I'm connecting you with one of our ${params.businessName || ''} specialists right now. A team member will respond to you shortly!`.replace(/\s+/g, ' '),
+      shouldHandoff: true,
+    };
+  }
+
+  const historyText = params.history
+    .slice(-8)
+    .map((m) => `${m.sender_type === 'customer' ? (params.contactName || 'Customer') : 'Assistant'}: ${m.text || ''}`)
+    .join('\n');
+
+  const system = `You are the 24/7 AI WhatsApp Assistant for ${params.businessName || 'our business'}.
+${params.businessContext ? `Business Knowledge & Guidelines:\n${params.businessContext}\n` : ''}
+Rules:
+- Be warm, concise (1-3 sentences), and helpful for WhatsApp.
+- Answer questions using ONLY the business context above when possible.
+- If the customer has a complex request, account-specific issue, billing dispute, or explicitly asks for a human, reply politely that you are handing them over to a human specialist and append [HANDOFF] at the very end of your response.`;
+
+  const prompt = `Recent conversation:\n${historyText}\n\nLatest customer message: "${params.latestMessage}"\n\nWrite the next assistant reply:`;
+
+  const aiText = await callGemini(prompt, system);
+  if (aiText) {
+    const shouldHandoff = aiText.includes('[HANDOFF]');
+    const cleanReply = aiText.replace(/\[HANDOFF\]/g, '').trim();
+    return { reply: cleanReply, shouldHandoff };
+  }
+
+  // Smart fallback if GEMINI_API_KEY is not configured yet
+  const fallbackReply =
+    params.welcomeFallback ||
+    `Hello ${params.contactName || 'there'}! Thanks for messaging ${params.businessName || 'us'}. Our team has received your message and a specialist will be with you shortly. (Reply "agent" anytime to escalate immediately.)`;
+
+  return { reply: fallbackReply, shouldHandoff: false };
 }
