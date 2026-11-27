@@ -4,6 +4,12 @@ import { getServiceSupabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+export interface WhatsAppTemplateButton {
+  type: string;
+  text: string;
+  url?: string;
+}
+
 export interface WhatsAppTemplateItem {
   name: string;
   language: string;
@@ -12,6 +18,7 @@ export interface WhatsAppTemplateItem {
   headerFormat?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
   headerText?: string;
   headerExampleUrl?: string;
+  buttons?: WhatsAppTemplateButton[];
 }
 
 const FALLBACK_TEMPLATES: WhatsAppTemplateItem[] = [
@@ -179,9 +186,15 @@ export async function GET(req: NextRequest) {
 
         const bodyComp = (t.components || []).find((c: any) => c.type === 'BODY');
         const headerComp = (t.components || []).find((c: any) => c.type === 'HEADER');
+        const buttonsComp = (t.components || []).find((c: any) => c.type === 'BUTTONS');
         const rawHandle = headerComp?.example?.header_handle?.[0];
         const headerExampleUrl =
           typeof rawHandle === 'string' && rawHandle.startsWith('http') ? rawHandle : undefined;
+        const buttons: WhatsAppTemplateButton[] = (buttonsComp?.buttons || []).map((b: any) => ({
+          type: b.type || 'QUICK_REPLY',
+          text: b.text || '',
+          url: b.url || undefined,
+        }));
 
         allMapped.push({
           name: t.name,
@@ -191,6 +204,7 @@ export async function GET(req: NextRequest) {
           headerFormat: headerComp?.format || undefined,
           headerText: headerComp?.text || undefined,
           headerExampleUrl,
+          buttons: buttons.length > 0 ? buttons : undefined,
         });
       }
     }

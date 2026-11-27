@@ -143,6 +143,10 @@ export async function POST(req: NextRequest) {
 
     const validSenderId = agentId && UUID_REGEX.test(agentId) ? agentId : null;
     const storedText = previewText || `Template: ${templateName}`;
+    const storedMediaType =
+      headerMediaType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerMediaType) && headerMediaUrl
+        ? headerMediaType.toLowerCase()
+        : null;
 
     const { data: message, error: msgError } = await supabase
       .from('messages')
@@ -151,6 +155,8 @@ export async function POST(req: NextRequest) {
         sender_type: 'agent',
         sender_id: validSenderId,
         text: storedText,
+        media_type: storedMediaType,
+        media_url: storedMediaType ? headerMediaUrl : null,
         status: sendResult.simulated ? 'delivered' : 'sent',
         whatsapp_message_id: sendResult.messageId || null,
       })

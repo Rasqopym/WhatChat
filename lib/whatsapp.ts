@@ -156,20 +156,52 @@ export async function sendWhatsAppTemplateMessage(params: {
 
   const components: any[] = [];
 
-  if (params.headerMediaType === 'IMAGE' && params.headerMediaUrl) {
+  if (
+    (params.headerMediaType === 'IMAGE' ||
+      params.headerMediaType === 'VIDEO' ||
+      params.headerMediaType === 'DOCUMENT') &&
+    params.headerMediaUrl
+  ) {
+    const mediaKey = params.headerMediaType.toLowerCase() as 'image' | 'video' | 'document';
+    let mediaObj: Record<string, string> = { link: params.headerMediaUrl };
+
+    // Meta's template example URLs (scontent/fbcdn) often fail async download if passed as link;
+    // re-upload to WhatsApp Media API to obtain a guaranteed native media ID.
+    if (/fbcdn\.net|fbsbx\.com|scontent/i.test(params.headerMediaUrl)) {
+      try {
+        const dlRes = await fetch(params.headerMediaUrl);
+        if (dlRes.ok) {
+          const contentType =
+            dlRes.headers.get('content-type') ||
+            (mediaKey === 'image' ? 'image/jpeg' : mediaKey === 'video' ? 'video/mp4' : 'application/pdf');
+          const arrBuf = await dlRes.arrayBuffer();
+          const formData = new FormData();
+          formData.append('messaging_product', 'whatsapp');
+          formData.append('type', contentType);
+          formData.append(
+            'file',
+            new Blob([arrBuf], { type: contentType }),
+            `template-header.${contentType.split('/')[1]?.split(';')[0] || 'bin'}`
+          );
+
+          const upRes = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/media`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: formData,
+          });
+          const upData = await upRes.json();
+          if (upRes.ok && upData?.id) {
+            mediaObj = { id: upData.id };
+          }
+        }
+      } catch {
+        // Fallback to link
+      }
+    }
+
     components.push({
       type: 'header',
-      parameters: [{ type: 'image', image: { link: params.headerMediaUrl } }],
-    });
-  } else if (params.headerMediaType === 'VIDEO' && params.headerMediaUrl) {
-    components.push({
-      type: 'header',
-      parameters: [{ type: 'video', video: { link: params.headerMediaUrl } }],
-    });
-  } else if (params.headerMediaType === 'DOCUMENT' && params.headerMediaUrl) {
-    components.push({
-      type: 'header',
-      parameters: [{ type: 'document', document: { link: params.headerMediaUrl } }],
+      parameters: [{ type: mediaKey, [mediaKey]: mediaObj }],
     });
   } else if (params.headerMediaType === 'TEXT' && params.headerTextParam) {
     components.push({

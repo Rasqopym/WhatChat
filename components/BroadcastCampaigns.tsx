@@ -31,6 +31,7 @@ interface TemplateItem {
   headerFormat?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
   headerText?: string;
   headerExampleUrl?: string;
+  buttons?: Array<{ type: string; text: string; url?: string }>;
 }
 
 export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
@@ -140,6 +141,9 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
     uniquePlaceholders.forEach((ph, idx) => {
       text = text.replaceAll(ph, paramValues[idx]?.trim() || ph);
     });
+    if (currentTpl.buttons && currentTpl.buttons.length > 0) {
+      text += '\n\n' + currentTpl.buttons.map((b) => `[${b.text}]`).join('  ');
+    }
     return text;
   };
 
@@ -333,11 +337,39 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
               </div>
             )}
 
-            <div className="bg-[#DCF8C6]/70 border border-emerald-200 rounded-xl p-3.5 text-xs text-slate-800 space-y-1">
+            <div className="bg-[#DCF8C6]/70 border border-emerald-200 rounded-xl p-3.5 text-xs text-slate-800 space-y-2">
               <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
                 WhatsApp Message Preview
               </div>
-              <p className="whitespace-pre-wrap leading-relaxed">{getPreviewText()}</p>
+              {currentTpl?.headerFormat === 'IMAGE' && headerMediaUrl && (
+                <img
+                  src={headerMediaUrl}
+                  alt="Template header"
+                  className="w-full max-h-44 object-cover rounded-lg border border-emerald-200"
+                />
+              )}
+              <p className="whitespace-pre-wrap leading-relaxed">
+                {(() => {
+                  if (!currentTpl) return `Broadcast: ${selectedTemplate}`;
+                  let text = currentTpl.bodyText;
+                  uniquePlaceholders.forEach((ph, idx) => {
+                    text = text.replaceAll(ph, paramValues[idx]?.trim() || ph);
+                  });
+                  return text;
+                })()}
+              </p>
+              {currentTpl?.buttons && currentTpl.buttons.length > 0 && (
+                <div className="pt-1.5 border-t border-emerald-200/80 flex flex-wrap gap-1.5">
+                  {currentTpl.buttons.map((btn, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/90 text-[#128C7E] font-semibold text-[11px] border border-emerald-200"
+                    >
+                      {btn.text}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-2">

@@ -108,11 +108,18 @@ export async function POST(req: NextRequest) {
             .maybeSingle();
 
           if (existingConv?.id) {
+            const storedMediaType =
+              headerMediaType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerMediaType) && headerMediaUrl
+                ? headerMediaType.toLowerCase()
+                : null;
+
             await supabase.from('messages').insert({
               conversation_id: existingConv.id,
               sender_type: 'agent',
               sender_id: validSenderId,
               text: storedText,
+              media_type: storedMediaType,
+              media_url: storedMediaType ? headerMediaUrl : null,
               status: sendResult.simulated ? 'delivered' : 'sent',
               whatsapp_message_id: sendResult.messageId || null,
             });
