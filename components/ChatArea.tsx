@@ -477,10 +477,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
                 )}
 
-                {/* Text Content */}
-                {msg.text && (
-                  <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>
-                )}
+                {/* Text Content (with WhatsApp-style Quoted Reply support) */}
+                {msg.text && (() => {
+                  const quoteMatch = msg.text.match(/^> Replying to: "([^"]*)"\n([\s\S]*)$/);
+                  if (quoteMatch) {
+                    return (
+                      <div>
+                        <div className="border-l-4 border-[#128C7E] bg-black/5 rounded-r-lg px-2.5 py-1.5 mb-1.5 text-xs text-slate-600 italic truncate">
+                          {quoteMatch[1]}
+                        </div>
+                        <p className="whitespace-pre-wrap break-words leading-relaxed">{quoteMatch[2]}</p>
+                      </div>
+                    );
+                  }
+                  return <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>;
+                })()}
 
                 {/* Delivery Failure Reason Banner */}
                 {!isCustomer && msg.status === 'failed' && (

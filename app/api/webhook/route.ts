@@ -199,6 +199,15 @@ export async function POST(req: NextRequest) {
 
       if (messageType === 'text') {
         messageText = incoming.text?.body || '';
+      } else if (messageType === 'button') {
+        messageText = incoming.button?.text || incoming.button?.payload || 'Button reply';
+      } else if (messageType === 'interactive') {
+        const btnReply = incoming.interactive?.button_reply?.title;
+        const listReply = incoming.interactive?.list_reply?.title;
+        const listDesc = incoming.interactive?.list_reply?.description;
+        messageText = btnReply || (listReply ? (listDesc ? `${listReply} — ${listDesc}` : listReply) : 'Interactive reply');
+      } else if (messageType === 'reaction') {
+        messageText = incoming.reaction?.emoji ? `Reacted: ${incoming.reaction.emoji}` : 'Removed reaction';
       } else if (messageType === 'image') {
         inboundMediaType = 'image';
         inboundMediaUrl = buildMediaProxyUrl(incoming.image?.id);
@@ -218,6 +227,24 @@ export async function POST(req: NextRequest) {
         messageText = incoming.document?.caption ? `${docName} — ${incoming.document.caption}` : `Document: ${docName}`;
       } else {
         messageText = `[${messageType} message]`;
+      }
+
+      // Preserve quoted-reply context if customer replied to a specific message
+      const quotedWamid = incoming.context?.id;
+      if (quotedWamid) {
+        try {
+          const { data: quotedMsg } = await supabase
+            .from('messages')
+            .select('text')
+            .eq('whatsapp_message_id', quotedWamid)
+            .maybeSingle();
+          if (quotedMsg?.text) {
+            const cleanQuote = quotedMsg.text.replace(/\s+/g, ' ').slice(0, 90);
+            messageText = `> Replying to: "${cleanQuote}"\n${messageText}`;
+          }
+        } catch {
+          // Ignore quote lookup error
+        }
       }
 
       // Step A: Find or create the Contact (scoped to business if resolved)
