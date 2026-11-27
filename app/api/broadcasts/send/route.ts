@@ -143,6 +143,33 @@ export async function POST(req: NextRequest) {
     const sentCount = results.filter((r) => r.status === 'sent').length;
     const failedCount = results.filter((r) => r.status === 'failed').length;
 
+    // 4. Persist campaign log to Supabase (graceful if table not yet created)
+    try {
+      let businessName = 'All Businesses';
+      if (validBizId) {
+        const { data: bizRow } = await supabase
+          .from('businesses')
+          .select('name')
+          .eq('id', validBizId)
+          .maybeSingle();
+        if (bizRow?.name) businessName = bizRow.name;
+      }
+
+      await supabase.from('broadcast_campaigns').insert({
+        business_id: validBizId,
+        business_name: businessName,
+        agent_id: validSenderId,
+        template_name: templateName,
+        target_tag: targetTag || 'ALL',
+        total_recipients: recipients.length,
+        sent_count: sentCount,
+        failed_count: failedCount,
+        preview_text: storedText,
+      });
+    } catch {
+      // Ignore if broadcast_campaigns table does not exist yet
+    }
+
     return NextResponse.json({
       success: true,
       total: recipients.length,

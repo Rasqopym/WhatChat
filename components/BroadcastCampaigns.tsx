@@ -14,6 +14,7 @@ import {
   Lock,
   LayoutTemplate,
   Shield,
+  History,
 } from 'lucide-react';
 
 interface BroadcastCampaignsProps {
@@ -56,6 +57,33 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
     failedCount: number;
     results: Array<{ phone: string; name: string; status: 'sent' | 'failed'; error?: string }>;
   } | null>(null);
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      business_name: string;
+      template_name: string;
+      target_tag: string;
+      total_recipients: number;
+      sent_count: number;
+      failed_count: number;
+      created_at: string;
+    }>
+  >([]);
+
+  const loadHistory = () => {
+    fetch('/api/broadcasts/history', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.campaigns)) {
+          setHistory(data.campaigns);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     setIsLoadingTemplates(true);
@@ -187,6 +215,7 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
           failedCount: data.failedCount,
           results: data.results || [],
         });
+        loadHistory();
       }
     } catch (err: any) {
       alert(`Network error: ${err.message}`);
@@ -461,6 +490,44 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
               </div>
             </div>
           )}
+
+          {/* Campaign History Log */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <History className="w-4 h-4 text-[#128C7E]" />
+                <span>Recent Campaigns</span>
+              </h3>
+              <span className="text-[11px] font-semibold text-slate-400">{history.length}</span>
+            </div>
+
+            {history.length === 0 ? (
+              <p className="text-xs text-slate-400 py-4 text-center">
+                No past broadcast campaigns logged yet.
+              </p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                {history.map((item) => (
+                  <div key={item.id} className="py-2.5 space-y-1 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-800 truncate">{item.template_name}</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
+                        {item.sent_count}/{item.total_recipients} sent
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>
+                        {item.business_name} · {item.target_tag === 'ALL' ? 'All Contacts' : item.target_tag}
+                      </span>
+                      <span>
+                        {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
