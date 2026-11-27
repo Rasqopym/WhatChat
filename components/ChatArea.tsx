@@ -482,6 +482,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>
                 )}
 
+                {/* Delivery Failure Reason Banner */}
+                {!isCustomer && msg.status === 'failed' && (
+                  <div className="mt-1.5 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1 flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <span>{msg.error_message || 'Delivery failed on WhatsApp.'}</span>
+                  </div>
+                )}
+
                 {/* Timestamp and Delivery Checks */}
                 <div className="flex items-center justify-end space-x-1 text-[10px] text-slate-500 mt-1">
                   <span>
@@ -489,7 +497,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </span>
                   {!isCustomer && (
                     <span>
-                      {msg.status === 'read' ? (
+                      {msg.status === 'failed' ? (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-rose-600 font-semibold"
+                          title={msg.error_message || 'Delivery failed'}
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5 inline" />
+                          <span>Failed</span>
+                        </span>
+                      ) : msg.status === 'read' ? (
                         <CheckCheck className="w-3.5 h-3.5 text-sky-500 inline" />
                       ) : msg.status === 'delivered' ? (
                         <CheckCheck className="w-3.5 h-3.5 text-slate-400 inline" />

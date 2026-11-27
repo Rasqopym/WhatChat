@@ -108,13 +108,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
 
-    // Handle delivery/read status updates
+    // Handle delivery/read/failed status updates
     if (value?.statuses && value.statuses.length > 0) {
       const statusUpdate = value.statuses[0];
       const messageId = statusUpdate.id;
-      const newStatus = statusUpdate.status; // 'sent' | 'delivered' | 'read'
+      const newStatus = statusUpdate.status; // 'sent' | 'delivered' | 'read' | 'failed'
 
-      if (['sent', 'delivered', 'read'].includes(newStatus)) {
+      if (newStatus === 'failed') {
+        const firstErr = statusUpdate.errors?.[0];
+        const errorReason = firstErr
+          ? [
+              firstErr.code ? `(#${firstErr.code})` : '',
+              firstErr.title || firstErr.message || 'Delivery failed',
+              firstErr.error_data?.details ? `— ${firstErr.error_data.details}` : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+          : 'Message delivery failed on WhatsApp';
+
+        const { error: failErr } = await supabase
+          .from('messages')
+          .update({ status: 'failed', error_message: errorReason })
+          .eq('whatsapp_message_id', messageId);
+
+        if (failErr) {
+          // Graceful fallback if error_message column hasn't been added yet
+          await supabase
+            .from('messages')
+            .update({ status: 'failed' })
+            .eq('whatsapp_message_id', messageId);
+        }
+      } else if (['sent', 'delivered', 'read'].includes(newStatus)) {
         await supabase
           .from('messages')
           .update({ status: newStatus })

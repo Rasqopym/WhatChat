@@ -55,7 +55,7 @@ export interface Conversation {
 }
 
 export type SenderType = 'customer' | 'agent' | 'bot';
-export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read';
+export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed';
 export type MessageMediaType = 'text' | 'image' | 'audio' | 'document' | 'video';
 
 export interface Message {
@@ -70,6 +70,7 @@ export interface Message {
   media_name?: string;
   audio_duration?: number; // seconds
   status: MessageDeliveryStatus;
+  error_message?: string | null;
   whatsapp_message_id?: string;
   created_at: string;
 }
