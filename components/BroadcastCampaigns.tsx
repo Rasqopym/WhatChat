@@ -43,6 +43,7 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string>('hello_world');
   const [paramValues, setParamValues] = useState<string[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [templateWarning, setTemplateWarning] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [report, setReport] = useState<{
     total: number;
@@ -52,17 +53,25 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
   } | null>(null);
 
   useEffect(() => {
-    fetch('/api/templates')
+    setIsLoadingTemplates(true);
+    setTemplateWarning(null);
+    const qs = selectedBusinessId ? `?businessId=${encodeURIComponent(selectedBusinessId)}` : '';
+    fetch(`/api/templates${qs}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.templates && data.templates.length > 0) {
           setTemplates(data.templates);
-          setSelectedTemplate(data.templates[0].name);
+          setSelectedTemplate((prev) =>
+            data.templates.some((t: TemplateItem) => t.name === prev) ? prev : data.templates[0].name
+          );
+        }
+        if (data.warning) {
+          setTemplateWarning(data.warning);
         }
       })
       .catch(console.error)
       .finally(() => setIsLoadingTemplates(false));
-  }, []);
+  }, [selectedBusinessId]);
 
   if (!isAdmin) {
     return (
@@ -262,6 +271,11 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
                   </option>
                 ))}
               </select>
+              {templateWarning && (
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
+                  {templateWarning}
+                </p>
+              )}
             </div>
 
             {uniquePlaceholders.length > 0 && (

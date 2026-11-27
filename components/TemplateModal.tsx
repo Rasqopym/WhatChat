@@ -44,17 +44,21 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/templates')
+    setIsLoading(true);
+    const qs = businessId ? `?businessId=${encodeURIComponent(businessId)}` : '';
+    fetch(`/api/templates${qs}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.templates && data.templates.length > 0) {
           setTemplates(data.templates);
-          setSelectedTemplate(data.templates[0].name);
+          setSelectedTemplate((prev) =>
+            data.templates.some((t: TemplateItem) => t.name === prev) ? prev : data.templates[0].name
+          );
         }
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [businessId]);
 
   const currentTpl = templates.find((t) => t.name === selectedTemplate) || templates[0];
 
@@ -64,7 +68,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
 
   // Build live preview text
   const getPreviewText = () => {
-    if (!currentTpl) return `📋 Template: ${selectedTemplate}`;
+    if (!currentTpl) return `Template: ${selectedTemplate}`;
     let text = currentTpl.bodyText;
     uniquePlaceholders.forEach((ph, idx) => {
       text = text.replaceAll(ph, paramValues[idx]?.trim() || ph);
