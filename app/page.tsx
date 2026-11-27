@@ -509,6 +509,7 @@ export default function WhatsAppMultiAgentApp() {
           history: currentMessages,
           contactName: selectedConv.contact?.name,
           businessContext: bizContext,
+          geminiApiKey: settings.geminiApiKey || undefined,
         }),
       });
       const data = await res.json();

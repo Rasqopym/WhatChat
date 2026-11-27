@@ -4,13 +4,13 @@ import { Message } from '@/types';
 
 export async function POST(req: NextRequest) {
   try {
-    const { history, contactName, businessContext } = await req.json();
+    const { history, contactName, businessContext, geminiApiKey } = await req.json();
 
     if (!history || !Array.isArray(history)) {
       return NextResponse.json({ error: 'Valid message history required' }, { status: 400 });
     }
 
-    const draft = await draftReply(history as Message[], contactName, businessContext);
+    const draft = await draftReply(history as Message[], contactName, businessContext, geminiApiKey);
 
     return NextResponse.json({ draft });
   } catch (error: any) {

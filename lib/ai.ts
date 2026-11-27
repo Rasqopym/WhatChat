@@ -6,8 +6,12 @@ const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 /**
  * Calls Google Gemini Flash to generate text based on a prompt
  */
-export async function callGemini(prompt: string, systemInstruction?: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY || activeSettings?.geminiApiKey;
+export async function callGemini(
+  prompt: string,
+  systemInstruction?: string,
+  apiKeyOverride?: string
+): Promise<string | null> {
+  const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY || activeSettings?.geminiApiKey;
   if (!apiKey || apiKey.includes('your_gemini_api_key')) {
     return null;
   }
@@ -50,41 +54,53 @@ export async function callGemini(prompt: string, systemInstruction?: string): Pr
 export async function draftReply(
   history: Message[],
   contactName?: string,
-  businessInfo?: string
+  businessInfo?: string,
+  apiKeyOverride?: string
 ): Promise<string> {
   const historyText = history
-    .slice(-10)
-    .map(m => `${m.sender_type === 'customer' ? (contactName || 'Customer') : 'Agent'}: ${m.text || ''}`)
+    .slice(-15)
+    .map((m) => {
+      const speaker =
+        m.sender_type === 'customer'
+          ? contactName || 'Customer'
+          : m.sender_type === 'bot'
+          ? 'AI Assistant'
+          : m.sender_name || 'Agent';
+      return `${speaker}: ${m.text || (m.media_type ? `[${m.media_type}]` : '')}`;
+    })
     .join('\n');
 
-  const system = `You are an AI customer support assistant helping a team member respond to a business WhatsApp message.
-Tone: Professional, friendly, concise, and helpful.
+  const system = `You are an AI customer support assistant helping a human agent respond to a business WhatsApp conversation.
+Tone: Natural, polite, concise (1-3 sentences), and context-aware for WhatsApp.
 Guidelines:
-- Keep the response short (1-3 sentences) suitable for WhatsApp.
-- Address the customer politely.
-- If asking for info, be clear and direct.
-${businessInfo ? `Business Info: ${businessInfo}` : ''}`;
+- Carefully study the full conversation history below—what has already been answered, paid, delivered, or thanked—so you never repeat greetings or ignore context.
+- If the customer just thanked you or said "you are welcome" / "ok", respond with a warm, brief closing (do not say "I am reviewing your request").
+- Use the Business Info below when answering product, pricing, hours, or policy questions.
+${businessInfo ? `Business Info:\n${businessInfo}` : ''}`;
 
-  const prompt = `Here is the recent conversation history with the customer:\n\n${historyText}\n\nDraft the next best reply for the agent to send to the customer. Do not include quotes; output only the ready-to-send message.`;
+  const prompt = `Full recent WhatsApp conversation:\n\n${historyText}\n\nSuggest the best next reply for the agent to send. Output ONLY the ready-to-send message without quotes.`;
 
-  const aiResult = await callGemini(prompt, system);
+  const aiResult = await callGemini(prompt, system, apiKeyOverride);
   if (aiResult) return aiResult;
 
-  // Fallback intelligent draft if API key is not yet set
+  // Smart fallback if GEMINI_API_KEY is not configured or unreachable
   const lastCustomerMsg = [...history].reverse().find(m => m.sender_type === 'customer');
   const msgText = lastCustomerMsg?.text?.toLowerCase() || '';
 
-  if (msgText.includes('pricing') || msgText.includes('quote')) {
-    return `Hello ${contactName || 'there'}! Thank you for your interest. We offer tailored volume packages for teams—could you let me know how many seats you are looking to equip?`;
+  if (msgText.includes('welcome') || msgText.includes('thank')) {
+    return `It's our pleasure, ${contactName || 'friend'}! Please feel free to reach out anytime if you need anything else.`;
   }
-  if (msgText.includes('invoice') || msgText.includes('receipt') || msgText.includes('vat')) {
-    return `Hi ${contactName || 'there'}, I would be happy to locate that invoice for you. Let me pull up your account records right now.`;
+  if (msgText === 'ok' || msgText === 'okay' || msgText === 'alright') {
+    return `Great! Let us know if you have any other questions—we're happy to help.`;
   }
-  if (msgText.includes('license') || msgText.includes('account')) {
-    return `Hi ${contactName || 'there'}! We can certainly help adjust your account licenses before your deadline. I will initiate the upgrade right away.`;
+  if (msgText.includes('receipt') || msgText.includes('invoice') || msgText.includes('payment') || lastCustomerMsg?.media_type === 'document') {
+    return `Thank you, ${contactName || 'there'}! We have received your document/receipt and are confirming it now.`;
+  }
+  if (msgText.includes('pricing') || msgText.includes('quote') || msgText.includes('how much')) {
+    return `Hello ${contactName || 'there'}! Thank you for your interest. Could you share which product or quantity you need so we can give you the exact price?`;
   }
 
-  return `Hello ${contactName || 'there'}! Thank you for reaching out to our team. I am reviewing your request right now and will assist you shortly.`;
+  return `Hello ${contactName || 'there'}! Thanks for your message—how can we assist you further today?`;
 }
 
 /**
