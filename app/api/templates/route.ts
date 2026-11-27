@@ -9,6 +9,9 @@ export interface WhatsAppTemplateItem {
   language: string;
   category: string;
   bodyText: string;
+  headerFormat?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  headerText?: string;
+  headerExampleUrl?: string;
 }
 
 const FALLBACK_TEMPLATES: WhatsAppTemplateItem[] = [
@@ -175,11 +178,19 @@ export async function GET(req: NextRequest) {
         seenKeys.add(key);
 
         const bodyComp = (t.components || []).find((c: any) => c.type === 'BODY');
+        const headerComp = (t.components || []).find((c: any) => c.type === 'HEADER');
+        const rawHandle = headerComp?.example?.header_handle?.[0];
+        const headerExampleUrl =
+          typeof rawHandle === 'string' && rawHandle.startsWith('http') ? rawHandle : undefined;
+
         allMapped.push({
           name: t.name,
           language: lang,
           category: t.category || 'UTILITY',
           bodyText: bodyComp?.text || `Template: ${t.name}`,
+          headerFormat: headerComp?.format || undefined,
+          headerText: headerComp?.text || undefined,
+          headerExampleUrl,
         });
       }
     }

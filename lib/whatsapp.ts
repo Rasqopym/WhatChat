@@ -134,6 +134,9 @@ export async function sendWhatsAppTemplateMessage(params: {
   templateName: string;
   languageCode?: string;
   bodyParams?: string[];
+  headerMediaType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT';
+  headerMediaUrl?: string;
+  headerTextParam?: string;
   overridePhoneNumberId?: string | null;
   overrideAccessToken?: string | null;
 }) {
@@ -151,13 +154,39 @@ export async function sendWhatsAppTemplateMessage(params: {
     language: { code: params.languageCode || 'en_US' },
   };
 
+  const components: any[] = [];
+
+  if (params.headerMediaType === 'IMAGE' && params.headerMediaUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'image', image: { link: params.headerMediaUrl } }],
+    });
+  } else if (params.headerMediaType === 'VIDEO' && params.headerMediaUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'video', video: { link: params.headerMediaUrl } }],
+    });
+  } else if (params.headerMediaType === 'DOCUMENT' && params.headerMediaUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'document', document: { link: params.headerMediaUrl } }],
+    });
+  } else if (params.headerMediaType === 'TEXT' && params.headerTextParam) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'text', text: params.headerTextParam }],
+    });
+  }
+
   if (params.bodyParams && params.bodyParams.length > 0) {
-    templateObj.components = [
-      {
-        type: 'body',
-        parameters: params.bodyParams.map((text) => ({ type: 'text', text })),
-      },
-    ];
+    components.push({
+      type: 'body',
+      parameters: params.bodyParams.map((text) => ({ type: 'text', text })),
+    });
+  }
+
+  if (components.length > 0) {
+    templateObj.components = components;
   }
 
   const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/messages`, {

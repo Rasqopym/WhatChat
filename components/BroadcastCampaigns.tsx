@@ -28,6 +28,9 @@ interface TemplateItem {
   language: string;
   category: string;
   bodyText: string;
+  headerFormat?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  headerText?: string;
+  headerExampleUrl?: string;
 }
 
 export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
@@ -42,6 +45,7 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('hello_world');
   const [paramValues, setParamValues] = useState<string[]>([]);
+  const [headerMediaUrl, setHeaderMediaUrl] = useState<string>('');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [templateWarning, setTemplateWarning] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -118,11 +122,20 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
   const matchedRecipients = Array.from(matchedMap.values());
 
   const currentTpl = templates.find((t) => t.name === selectedTemplate) || templates[0];
-  const placeholderMatches = currentTpl?.bodyText.match(/\{\{\d+\}\}/g) || [];
+  const needsHeaderMedia =
+    currentTpl?.headerFormat === 'IMAGE' ||
+    currentTpl?.headerFormat === 'VIDEO' ||
+    currentTpl?.headerFormat === 'DOCUMENT';
+
+  useEffect(() => {
+    setHeaderMediaUrl(currentTpl?.headerExampleUrl || '');
+  }, [currentTpl?.name, currentTpl?.headerExampleUrl]);
+
+  const placeholderMatches = currentTpl?.bodyText.match(/\{\{[^}]+\}\}/g) || [];
   const uniquePlaceholders = Array.from(new Set(placeholderMatches));
 
   const getPreviewText = () => {
-    if (!currentTpl) return `📢 Broadcast: ${selectedTemplate}`;
+    if (!currentTpl) return `Broadcast: ${selectedTemplate}`;
     let text = currentTpl.bodyText;
     uniquePlaceholders.forEach((ph, idx) => {
       text = text.replaceAll(ph, paramValues[idx]?.trim() || ph);
@@ -152,6 +165,8 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
           templateName: selectedTemplate,
           languageCode: currentTpl?.language || 'en_US',
           bodyParams: uniquePlaceholders.map((_, idx) => paramValues[idx] || ''),
+          headerMediaType: needsHeaderMedia ? currentTpl?.headerFormat : undefined,
+          headerMediaUrl: needsHeaderMedia ? headerMediaUrl.trim() : undefined,
           previewText: getPreviewText(),
           agentId: currentAgent.id,
           fallbackRecipients: matchedRecipients,
@@ -277,6 +292,25 @@ export const BroadcastCampaigns: React.FC<BroadcastCampaignsProps> = ({
                 </p>
               )}
             </div>
+
+            {needsHeaderMedia && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  Header {currentTpl?.headerFormat} URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={headerMediaUrl}
+                  onChange={(e) => setHeaderMediaUrl(e.target.value)}
+                  placeholder={`https://example.com/media.${currentTpl?.headerFormat === 'IMAGE' ? 'jpg' : currentTpl?.headerFormat === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Required by Meta for templates with a {currentTpl?.headerFormat?.toLowerCase()} header.
+                </p>
+              </div>
+            )}
 
             {uniquePlaceholders.length > 0 && (
               <div className="space-y-2">

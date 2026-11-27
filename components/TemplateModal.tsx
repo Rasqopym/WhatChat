@@ -9,6 +9,9 @@ interface TemplateItem {
   language: string;
   category: string;
   bodyText: string;
+  headerFormat?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  headerText?: string;
+  headerExampleUrl?: string;
 }
 
 interface TemplateModalProps {
@@ -35,6 +38,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('hello_world');
   const [paramValues, setParamValues] = useState<string[]>([]);
+  const [headerMediaUrl, setHeaderMediaUrl] = useState<string>('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [businessId, setBusinessId] = useState(
@@ -61,9 +65,17 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   }, [businessId]);
 
   const currentTpl = templates.find((t) => t.name === selectedTemplate) || templates[0];
+  const needsHeaderMedia =
+    currentTpl?.headerFormat === 'IMAGE' ||
+    currentTpl?.headerFormat === 'VIDEO' ||
+    currentTpl?.headerFormat === 'DOCUMENT';
 
-  // Detect {{1}}, {{2}} placeholders in template body
-  const placeholderMatches = currentTpl?.bodyText.match(/\{\{\d+\}\}/g) || [];
+  useEffect(() => {
+    setHeaderMediaUrl(currentTpl?.headerExampleUrl || '');
+  }, [currentTpl?.name, currentTpl?.headerExampleUrl]);
+
+  // Detect {{1}}, {{2}} or named {{var}} placeholders in template body
+  const placeholderMatches = currentTpl?.bodyText.match(/\{\{[^}]+\}\}/g) || [];
   const uniquePlaceholders = Array.from(new Set(placeholderMatches));
 
   // Build live preview text
@@ -94,6 +106,8 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
           templateName: selectedTemplate,
           languageCode: currentTpl?.language || 'en_US',
           bodyParams: uniquePlaceholders.map((_, idx) => paramValues[idx] || ''),
+          headerMediaType: needsHeaderMedia ? currentTpl?.headerFormat : undefined,
+          headerMediaUrl: needsHeaderMedia ? headerMediaUrl.trim() : undefined,
           previewText: getPreviewText(),
           agentId: currentAgent.id,
         }),
@@ -206,6 +220,26 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Header Media URL if template has IMAGE/VIDEO/DOCUMENT header */}
+          {needsHeaderMedia && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Header {currentTpl?.headerFormat} URL *
+              </label>
+              <input
+                type="url"
+                required
+                value={headerMediaUrl}
+                onChange={(e) => setHeaderMediaUrl(e.target.value)}
+                placeholder={`https://example.com/media.${currentTpl?.headerFormat === 'IMAGE' ? 'jpg' : currentTpl?.headerFormat === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                className="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+              />
+              <p className="text-[10px] text-slate-400">
+                Required by Meta for templates with a {currentTpl?.headerFormat?.toLowerCase()} header.
+              </p>
+            </div>
+          )}
 
           {/* Dynamic Variables if template has {{1}}, {{2}} */}
           {uniquePlaceholders.length > 0 && (

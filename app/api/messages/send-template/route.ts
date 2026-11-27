@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
       templateName,
       languageCode,
       bodyParams,
+      headerMediaType,
+      headerMediaUrl,
       previewText,
       agentId,
     } = await req.json();
@@ -133,6 +135,8 @@ export async function POST(req: NextRequest) {
       templateName,
       languageCode: languageCode || 'en_US',
       bodyParams: Array.isArray(bodyParams) ? bodyParams : [],
+      headerMediaType,
+      headerMediaUrl,
       overridePhoneNumberId: bizPhoneId,
       overrideAccessToken: bizToken,
     });
