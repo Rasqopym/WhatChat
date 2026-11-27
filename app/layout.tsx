@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: 'WhatChat — Multi-Business WhatsApp Team Inbox',
   description: 'AI-Powered Multi-Agent & Multi-Business WhatsApp Inbox supporting 10+ simultaneous team members',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/api/icon?size=192',
+    apple: '/api/icon?size=192',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

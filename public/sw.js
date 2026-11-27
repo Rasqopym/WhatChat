@@ -7,6 +7,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Required fetch handler for PWA installability on Android / Chrome
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+});
+
 // Handle notification click: focus existing tab or open app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

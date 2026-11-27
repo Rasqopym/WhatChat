@@ -10,6 +10,7 @@ import { AdminSettings } from '@/components/AdminSettings';
 import { LoginPage } from '@/components/LoginPage';
 import { TemplateModal } from '@/components/TemplateModal';
 import { BroadcastCampaigns } from '@/components/BroadcastCampaigns';
+import { InstallPwaBanner } from '@/components/InstallPwaBanner';
 import {
   MOCK_AGENTS,
   MOCK_BUSINESSES,
@@ -834,6 +835,9 @@ export default function WhatsAppMultiAgentApp() {
           }}
         />
       )}
+
+      {/* Mobile / Desktop PWA Install Prompt */}
+      <InstallPwaBanner />
     </div>
   );
 }
