@@ -10,7 +10,8 @@ import {
   Lock,
   Bell,
   BellOff,
-  Megaphone
+  Megaphone,
+  Smartphone
 } from 'lucide-react';
 
 export type ActiveView = 'inbox' | 'dashboard' | 'broadcasts' | 'settings';
@@ -130,6 +131,15 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             >
               {alertsActive ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
             </button>
+
+            {/* Install Mobile / Desktop App */}
+            <button
+              onClick={() => window.dispatchEvent(new Event('whatchat-open-install'))}
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-[#25D366] hover:bg-slate-800 transition-all cursor-pointer"
+              title="Install WhatChat App on Phone / Desktop"
+            >
+              <Smartphone className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -227,6 +237,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               {!isAdmin && <Lock className="w-2.5 h-2.5 text-amber-400 absolute -top-1 -right-1" />}
             </div>
             <span className="text-[10px] font-semibold">Settings</span>
+          </button>
+
+          <button
+            onClick={() => window.dispatchEvent(new Event('whatchat-open-install'))}
+            className="flex flex-col items-center justify-center space-y-0.5 px-2.5 py-1 rounded-xl text-[#25D366]"
+          >
+            <Smartphone className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">Install</span>
           </button>
 
           <button
