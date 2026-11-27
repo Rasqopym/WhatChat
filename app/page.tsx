@@ -696,6 +696,7 @@ export default function WhatsAppMultiAgentApp() {
           businesses={businesses}
           conversations={conversations}
           currentAgent={currentAgent}
+          onContactsImported={syncLiveInbox}
         />
       )}
 
