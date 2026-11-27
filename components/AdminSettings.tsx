@@ -22,7 +22,8 @@ import {
   Pencil,
   Shield,
   ShieldCheck,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 
 interface AdminSettingsProps {
@@ -93,6 +94,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newBizToken, setNewBizToken] = useState('');
   const [newBizColor, setNewBizColor] = useState('#128C7E');
   const [newBizContext, setNewBizContext] = useState('');
+  const [syncWebsiteUrl, setSyncWebsiteUrl] = useState('');
+  const [isSyncingWebsite, setIsSyncingWebsite] = useState(false);
 
   const openAddBizModal = () => {
     setEditingBizId(null);
@@ -114,6 +117,30 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     setNewBizColor(biz.brand_color || '#128C7E');
     setNewBizContext(biz.ai_context || '');
     setShowBizModal(true);
+  };
+
+  const handleSyncWebsite = async () => {
+    if (!syncWebsiteUrl.trim() || isSyncingWebsite) return;
+    setIsSyncingWebsite(true);
+    try {
+      const res = await fetch('/api/businesses/sync-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl: syncWebsiteUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Website sync failed: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      if (data.knowledge) {
+        setNewBizContext(data.knowledge);
+      }
+    } catch (err: any) {
+      alert(`Error syncing website: ${err.message}`);
+    } finally {
+      setIsSyncingWebsite(false);
+    }
   };
 
   const handleSaveBusiness = async (e: React.FormEvent) => {
@@ -973,9 +1000,33 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               </div>
 
               <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">
+                  Sync Knowledge from Website (Optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={syncWebsiteUrl}
+                    onChange={(e) => setSyncWebsiteUrl(e.target.value)}
+                    placeholder="https://blackpanther.com.ng"
+                    className="flex-1 text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSyncWebsite}
+                    disabled={!syncWebsiteUrl.trim() || isSyncingWebsite}
+                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
+                  >
+                    {isSyncingWebsite ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                    <span>{isSyncingWebsite ? 'Syncing...' : 'Fetch & Sync'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1">AI Context / Business Info</label>
                 <textarea
-                  rows={2}
+                  rows={4}
                   value={newBizContext}
                   onChange={(e) => setNewBizContext(e.target.value)}
                   placeholder="Products, pricing, return policy for this business..."

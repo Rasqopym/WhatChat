@@ -1,42 +1,47 @@
 import { Message } from '@/types';
+import { activeSettings } from '@/lib/settings-store';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
 /**
  * Calls Google Gemini Flash to generate text based on a prompt
  */
-async function callGemini(prompt: string, systemInstruction?: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+export async function callGemini(prompt: string, systemInstruction?: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY || activeSettings?.geminiApiKey;
   if (!apiKey || apiKey.includes('your_gemini_api_key')) {
     return null;
   }
 
-  try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 500,
-        },
-      }),
-    });
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 600,
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      console.warn('Gemini API call returned non-200');
-      return null;
+      if (!response.ok) {
+        console.warn(`Gemini API (${model}) returned ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text.trim();
+    } catch (err) {
+      console.error(`Gemini API error (${model}):`, err);
     }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text ? text.trim() : null;
-  } catch (err) {
-    console.error('Gemini API error:', err);
-    return null;
   }
+
+  return null;
 }
 
 /**
