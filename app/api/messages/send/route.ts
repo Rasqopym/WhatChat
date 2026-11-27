@@ -6,7 +6,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export async function POST(req: NextRequest) {
   try {
-    const { conversationId, text, agentId, media } = await req.json();
+    const { conversationId, text, agentId, media, replyTo } = await req.json();
 
     if (!conversationId || (!text && !media)) {
       return NextResponse.json({ error: 'Missing conversationId or text/media' }, { status: 400 });
@@ -61,13 +61,15 @@ export async function POST(req: NextRequest) {
         filename: media.name,
         overridePhoneNumberId: bizPhoneId,
         overrideAccessToken: bizToken,
+        replyToWamid: replyTo?.wamid || null,
       });
     } else {
       sendResult = await sendWhatsAppTextMessage(
         recipientPhone,
         text || media?.name || 'Attachment',
         bizPhoneId,
-        bizToken
+        bizToken,
+        replyTo?.wamid || null
       );
     }
 
@@ -84,7 +86,9 @@ export async function POST(req: NextRequest) {
         : media?.type === 'document'
         ? `Document: ${media.name || 'file'}`
         : '';
-    const storedText = media ? (text ? `${mediaLabel}\n${text}` : mediaLabel) : text;
+    const baseText = media ? (text ? `${mediaLabel}\n${text}` : mediaLabel) : text;
+    const cleanQuote = replyTo?.text ? String(replyTo.text).replace(/\s+/g, ' ').slice(0, 90) : '';
+    const storedText = cleanQuote ? `> Replying to: "${cleanQuote}"\n${baseText}` : baseText;
 
     const { data: message, error: msgError } = await supabase
       .from('messages')

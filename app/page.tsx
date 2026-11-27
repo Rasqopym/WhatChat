@@ -326,12 +326,16 @@ export default function WhatsAppMultiAgentApp() {
     }
   };
 
-  // 1. Send Message (with Text, Image, Voice, or Document)
+  // 1. Send Message (with Text, Image, Voice, Document, or Quoted Reply)
   const handleSendMessage = async (
     text: string,
-    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string }
+    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string },
+    replyTo?: { id: string; wamid?: string; text?: string }
   ) => {
     if (!selectedConv) return;
+
+    const cleanQuote = replyTo?.text ? replyTo.text.replace(/\s+/g, ' ').slice(0, 90) : '';
+    const optimisticText = cleanQuote ? `> Replying to: "${cleanQuote}"\n${text}` : text;
 
     const newMsg: Message = {
       id: `m-${Date.now()}`,
@@ -339,7 +343,7 @@ export default function WhatsAppMultiAgentApp() {
       sender_type: 'agent',
       sender_id: currentAgent.id,
       sender_name: currentAgent.name,
-      text,
+      text: optimisticText,
       media_type: media?.type,
       media_url: media?.url,
       media_name: media?.name,
@@ -378,6 +382,7 @@ export default function WhatsAppMultiAgentApp() {
           agentId: currentAgent.id,
           agentName: currentAgent.name,
           media,
+          replyTo,
         }),
       });
       const result = await res.json();
@@ -390,6 +395,30 @@ export default function WhatsAppMultiAgentApp() {
       console.warn('API send failed:', e);
       alert(`Network error sending message: ${e.message}`);
     }
+  };
+
+  // 1b. Forward a Message to another Conversation
+  const handleForwardMessage = async (targetConvId: string, msg: Message) => {
+    const rawBody = msg.text?.replace(/^> Replying to: "[^"]*"\n/, '') || msg.media_name || 'Forwarded attachment';
+    const forwardedText = `Forwarded: ${rawBody}`;
+
+    const res = await fetch('/api/messages/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: targetConvId,
+        text: forwardedText,
+        agentId: currentAgent.id,
+        agentName: currentAgent.name,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      alert(`Failed to forward message: ${result.error || 'Unknown error'}`);
+      return;
+    }
+    await syncLiveInbox();
+    setSelectedId(targetConvId);
   };
 
   // 2. Draft Reply with AI (using per-business AI context!)
@@ -630,7 +659,9 @@ export default function WhatsAppMultiAgentApp() {
               messages={currentMessages}
               currentAgent={currentAgent}
               cannedResponses={cannedResponses}
+              allConversations={conversations}
               onSendMessage={handleSendMessage}
+              onForwardMessage={handleForwardMessage}
               onDraftWithAI={handleDraftWithAI}
               onStatusChange={handleStatusChange}
               onBackMobile={() => setMobileShowChat(false)}

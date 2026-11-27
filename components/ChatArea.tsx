@@ -23,7 +23,10 @@ import {
   ArrowLeft,
   Info,
   LayoutTemplate,
-  Bot
+  Bot,
+  Reply,
+  Smile,
+  Forward
 } from 'lucide-react';
 
 interface ChatAreaProps {
@@ -32,10 +35,13 @@ interface ChatAreaProps {
   messages: Message[];
   currentAgent: Agent;
   cannedResponses: CannedResponse[];
+  allConversations?: Conversation[];
   onSendMessage: (
     text: string,
-    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string }
+    media?: { type: MessageMediaType; url: string; name?: string; duration?: number; base64?: string; mimeType?: string },
+    replyTo?: { id: string; wamid?: string; text?: string }
   ) => Promise<void>;
+  onForwardMessage?: (targetConvId: string, msg: Message) => Promise<void>;
   onDraftWithAI: () => Promise<string>;
   onStatusChange: (status: 'open' | 'pending' | 'closed') => void;
   onBackMobile?: () => void;
@@ -49,7 +55,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
   currentAgent,
   cannedResponses,
+  allConversations = [],
   onSendMessage,
+  onForwardMessage,
   onDraftWithAI,
   onStatusChange,
   onBackMobile,
@@ -81,6 +89,45 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Image Lightbox State
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Reply / Reaction / Forward State
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+  const [reactionsMap, setReactionsMap] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('whatchat_reactions');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [forwardSearch, setForwardSearch] = useState('');
+  const [isForwarding, setIsForwarding] = useState(false);
+
+  const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+  const handleReact = async (msg: Message, emoji: string) => {
+    setReactingMessageId(null);
+    const next = { ...reactionsMap, [msg.id]: emoji };
+    setReactionsMap(next);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('whatchat_reactions', JSON.stringify(next));
+      } catch {}
+    }
+    if (!conversation) return;
+    fetch('/api/messages/react', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: conversation.id,
+        whatsappMessageId: msg.whatsapp_message_id || null,
+        emoji,
+      }),
+    }).catch(() => {});
+  };
 
   // Auto-scroll
   useEffect(() => {
@@ -167,20 +214,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     setIsSending(true);
     try {
+      const replyPayload = replyingTo
+        ? {
+            id: replyingTo.id,
+            wamid: replyingTo.whatsapp_message_id || undefined,
+            text:
+              replyingTo.text?.replace(/^> Replying to: "[^"]*"\n/, '') ||
+              replyingTo.media_name ||
+              replyingTo.media_type ||
+              'Message',
+          }
+        : undefined;
+
       if (pendingFile) {
         const prepared = await prepareFileForWhatsApp(pendingFile.file, pendingFile.type);
-        await onSendMessage(inputText.trim(), {
-          type: pendingFile.type,
-          url: prepared.dataUrl,
-          name: prepared.filename,
-          base64: prepared.base64,
-          mimeType: prepared.mimeType,
-        });
+        await onSendMessage(
+          inputText.trim(),
+          {
+            type: pendingFile.type,
+            url: prepared.dataUrl,
+            name: prepared.filename,
+            base64: prepared.base64,
+            mimeType: prepared.mimeType,
+          },
+          replyPayload
+        );
         setPendingFile(null);
       } else {
-        await onSendMessage(inputText.trim());
+        await onSendMessage(inputText.trim(), undefined, replyPayload);
       }
       setInputText('');
+      setReplyingTo(null);
     } finally {
       setIsSending(false);
     }
@@ -357,21 +421,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
         {messages.map((msg) => {
           const isCustomer = msg.sender_type === 'customer';
+          const activeReaction = reactionsMap[msg.id];
 
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isCustomer ? 'items-start' : 'items-end'}`}
+              className={`group flex flex-col ${isCustomer ? 'items-start' : 'items-end'}`}
             >
-              <div
-                className={`max-w-[82%] md:max-w-[65%] rounded-xl p-3 text-sm shadow-sm relative ${
-                  isCustomer
-                    ? 'bg-white text-slate-900 rounded-tl-none'
-                    : msg.sender_type === 'bot'
-                    ? 'bg-purple-50 border border-purple-200 text-slate-900 rounded-tr-none'
-                    : 'bg-[#DCF8C6] text-slate-900 rounded-tr-none'
-                }`}
-              >
+              <div className={`flex items-center gap-1.5 max-w-[88%] md:max-w-[70%] ${isCustomer ? 'flex-row' : 'flex-row-reverse'}`}>
+                <div
+                  className={`rounded-xl p-3 text-sm shadow-sm relative ${
+                    activeReaction ? 'mb-2.5' : ''
+                  } ${
+                    isCustomer
+                      ? 'bg-white text-slate-900 rounded-tl-none'
+                      : msg.sender_type === 'bot'
+                      ? 'bg-purple-50 border border-purple-200 text-slate-900 rounded-tr-none'
+                      : 'bg-[#DCF8C6] text-slate-900 rounded-tr-none'
+                  }`}
+                >
                 {/* Agent or AI Bot Attribution */}
                 {!isCustomer && (
                   <div
@@ -526,6 +594,63 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </span>
                   )}
                 </div>
+
+                {/* Reaction Badge */}
+                {activeReaction && (
+                  <span className="absolute -bottom-3 right-2 bg-white border border-slate-200 shadow-sm rounded-full px-1.5 py-0.5 text-xs leading-none">
+                    {activeReaction}
+                  </span>
+                )}
+
+                {/* Emoji Picker Popover */}
+                {reactingMessageId === msg.id && (
+                  <div className={`absolute -top-10 ${isCustomer ? 'left-0' : 'right-0'} z-20 bg-white border border-slate-200 shadow-lg rounded-full px-2 py-1 flex items-center gap-1`}>
+                    {REACTION_EMOJIS.map((em) => (
+                      <button
+                        key={em}
+                        type="button"
+                        onClick={() => handleReact(msg, em)}
+                        className="hover:scale-125 transition-transform text-base px-0.5 cursor-pointer"
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                </div>
+
+                {/* Hover Action Buttons: Reply, React, Forward */}
+                <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-0.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg px-1 py-0.5 shadow-sm flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(msg)}
+                    className="p-1 text-slate-500 hover:text-[#128C7E] rounded cursor-pointer"
+                    title="Reply to message"
+                  >
+                    <Reply className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReactingMessageId(reactingMessageId === msg.id ? null : msg.id)}
+                    className="p-1 text-slate-500 hover:text-amber-600 rounded cursor-pointer"
+                    title="React with emoji"
+                  >
+                    <Smile className="w-3.5 h-3.5" />
+                  </button>
+                  {onForwardMessage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForwardSearch('');
+                        setForwardingMessage(msg);
+                      }}
+                      className="p-1 text-slate-500 hover:text-indigo-600 rounded cursor-pointer"
+                      title="Forward message"
+                    >
+                      <Forward className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -678,6 +803,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
           </div>
 
+          {/* Quoted Reply Context Bar */}
+          {replyingTo && (
+            <div className="mb-2 flex items-center justify-between bg-emerald-50 border-l-4 border-[#128C7E] rounded-r-lg px-3 py-1.5 text-xs">
+              <div className="min-w-0">
+                <div className="font-bold text-[#128C7E] text-[11px]">
+                  Replying to {replyingTo.sender_type === 'customer' ? (conversation.contact?.name || 'Customer') : (replyingTo.sender_name || 'Agent')}
+                </div>
+                <div className="text-slate-600 truncate">
+                  {replyingTo.text?.replace(/^> Replying to: "[^"]*"\n/, '') || replyingTo.media_name || replyingTo.media_type || 'Message'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="text-slate-400 hover:text-slate-600 ml-2 cursor-pointer"
+                aria-label="Cancel reply"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Input & Send Form */}
           <form onSubmit={handleSend} className="flex items-end space-x-2">
             <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-[#128C7E] focus-within:border-transparent p-2">
@@ -749,6 +896,76 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               alt="Full size preview"
               className="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain"
             />
+          </div>
+        </div>
+      )}
+
+      {/* 8. Forward Message Modal */}
+      {forwardingMessage && onForwardMessage && (
+        <div
+          onClick={() => setForwardingMessage(null)}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-3"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Forward className="w-4 h-4 text-[#128C7E]" />
+                <span>Forward Message To</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setForwardingMessage(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={forwardSearch}
+              onChange={(e) => setForwardSearch(e.target.value)}
+              placeholder="Search contact or phone..."
+              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+            />
+
+            <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+              {allConversations
+                .filter((c) => {
+                  const q = forwardSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    (c.contact?.name || '').toLowerCase().includes(q) ||
+                    (c.contact?.phone_number || '').toLowerCase().includes(q)
+                  );
+                })
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={isForwarding}
+                    onClick={async () => {
+                      setIsForwarding(true);
+                      try {
+                        await onForwardMessage(c.id, forwardingMessage);
+                        setForwardingMessage(null);
+                      } finally {
+                        setIsForwarding(false);
+                      }
+                    }}
+                    className="w-full text-left py-2.5 px-2 hover:bg-slate-50 rounded-lg flex items-center justify-between text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <div>
+                      <div className="font-semibold text-slate-800">{c.contact?.name || c.contact?.phone_number}</div>
+                      <div className="text-[11px] text-slate-400">{c.contact?.phone_number}</div>
+                    </div>
+                    <span className="text-[#128C7E] font-semibold">Send</span>
+                  </button>
+                ))}
+            </div>
           </div>
         </div>
       )}

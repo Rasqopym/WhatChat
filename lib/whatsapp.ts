@@ -11,7 +11,8 @@ export async function sendWhatsAppTextMessage(
   to: string,
   message: string,
   overridePhoneNumberId?: string | null,
-  overrideAccessToken?: string | null
+  overrideAccessToken?: string | null,
+  replyToWamid?: string | null
 ) {
   const phoneNumberId = overridePhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
   const accessToken = overrideAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
@@ -23,6 +24,16 @@ export async function sendWhatsAppTextMessage(
 
   // Format phone number to clean E.164 without '+'
   const formattedTo = to.replace(/\+/g, '').replace(/\s+/g, '');
+  const payload: Record<string, any> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: formattedTo,
+    type: 'text',
+    text: { preview_url: false, body: message },
+  };
+  if (replyToWamid) {
+    payload.context = { message_id: replyToWamid };
+  }
 
   const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/messages`, {
     method: 'POST',
@@ -30,13 +41,7 @@ export async function sendWhatsAppTextMessage(
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: formattedTo,
-      type: 'text',
-      text: { preview_url: false, body: message },
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json();
@@ -58,6 +63,7 @@ export async function sendWhatsAppMediaMessage(params: {
   filename?: string;
   overridePhoneNumberId?: string | null;
   overrideAccessToken?: string | null;
+  replyToWamid?: string | null;
 }) {
   const phoneNumberId = params.overridePhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
   const accessToken = params.overrideAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
@@ -109,6 +115,9 @@ export async function sendWhatsAppMediaMessage(params: {
     if (params.caption) payload.document.caption = params.caption;
   } else if (params.mediaType === 'audio') {
     payload.audio = { id: uploadData.id };
+  }
+  if (params.replyToWamid) {
+    payload.context = { message_id: params.replyToWamid };
   }
 
   const msgRes = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/messages`, {
@@ -266,4 +275,45 @@ export async function markWhatsAppMessageAsRead(messageId: string) {
   } catch (error) {
     console.error('Failed to mark message as read:', error);
   }
+}
+
+export async function sendWhatsAppReactionMessage(params: {
+  to: string;
+  messageId: string;
+  emoji: string;
+  overridePhoneNumberId?: string | null;
+  overrideAccessToken?: string | null;
+}) {
+  const phoneNumberId = params.overridePhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || activeSettings?.phoneNumberId;
+  const accessToken = params.overrideAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || activeSettings?.accessToken;
+
+  if (!phoneNumberId || !accessToken) {
+    return { success: true, simulated: true };
+  }
+
+  const formattedTo = params.to.replace(/\+/g, '').replace(/\s+/g, '');
+  const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formattedTo,
+      type: 'reaction',
+      reaction: {
+        message_id: params.messageId,
+        emoji: params.emoji,
+      },
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Failed to send WhatsApp reaction');
+  }
+
+  return { success: true, messageId: data.messages?.[0]?.id };
 }
