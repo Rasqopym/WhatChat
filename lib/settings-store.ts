@@ -6,4 +6,5 @@ export const activeSettings = {
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   autoReplyEnabled: process.env.AI_AUTO_REPLY_ENABLED === 'true',
   autoReplyMessage: '',
+  autoAssignEnabled: process.env.AUTO_ASSIGN_ENABLED === 'true',
 };

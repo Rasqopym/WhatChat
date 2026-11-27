@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     if (data.geminiApiKey) activeSettings.geminiApiKey = data.geminiApiKey;
     if (typeof data.autoReplyEnabled === 'boolean') activeSettings.autoReplyEnabled = data.autoReplyEnabled;
     if (typeof data.autoReplyMessage === 'string') activeSettings.autoReplyMessage = data.autoReplyMessage;
+    if (typeof data.autoAssignEnabled === 'boolean') activeSettings.autoAssignEnabled = data.autoAssignEnabled;
 
     // Also update process.env dynamically for the current node process
     if (data.phoneNumberId) process.env.WHATSAPP_PHONE_NUMBER_ID = data.phoneNumberId;
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
     if (data.geminiApiKey) process.env.GEMINI_API_KEY = data.geminiApiKey;
     if (typeof data.autoReplyEnabled === 'boolean') {
       process.env.AI_AUTO_REPLY_ENABLED = data.autoReplyEnabled ? 'true' : 'false';
+    }
+    if (typeof data.autoAssignEnabled === 'boolean') {
+      process.env.AUTO_ASSIGN_ENABLED = data.autoAssignEnabled ? 'true' : 'false';
     }
 
     return NextResponse.json({ success: true, message: 'Settings saved and activated successfully!' });

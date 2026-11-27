@@ -100,5 +100,6 @@ export interface AppSettings {
   businessName: string;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
+  autoAssignEnabled?: boolean;
   operatingHours: string;
 }

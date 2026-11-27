@@ -647,6 +647,22 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 />
               </div>
             )}
+
+            {/* Round-Robin Auto-Assignment Toggle */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-800">Automatic Round-Robin Assignment</div>
+                <div className="text-xs text-slate-500">
+                  Assign new incoming chats to the online agent with the fewest active tickets
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={!!form.autoAssignEnabled}
+                onChange={(e) => setForm({ ...form, autoAssignEnabled: e.target.checked })}
+                className="w-5 h-5 accent-[#128C7E] cursor-pointer"
+              />
+            </div>
           </div>
         </div>
 

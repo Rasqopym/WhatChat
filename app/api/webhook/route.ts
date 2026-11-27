@@ -280,6 +280,44 @@ export async function POST(req: NextRequest) {
         };
         if (resolvedBusinessId) convPayload.business_id = resolvedBusinessId;
 
+        // Optional Automatic Round-Robin Assignment among online agents
+        const autoAssignOn =
+          process.env.AUTO_ASSIGN_ENABLED === 'true' || activeSettings.autoAssignEnabled;
+        if (autoAssignOn) {
+          try {
+            const { data: onlineAgents } = await supabase
+              .from('agents')
+              .select('id')
+              .eq('is_online', true)
+              .order('created_at', { ascending: true });
+
+            if (onlineAgents && onlineAgents.length > 0) {
+              const { data: activeConvs } = await supabase
+                .from('conversations')
+                .select('assigned_agent_id')
+                .neq('status', 'closed')
+                .not('assigned_agent_id', 'is', null);
+
+              const loadMap: Record<string, number> = {};
+              for (const ag of onlineAgents) loadMap[ag.id] = 0;
+              for (const c of activeConvs || []) {
+                if (c.assigned_agent_id && c.assigned_agent_id in loadMap) {
+                  loadMap[c.assigned_agent_id] += 1;
+                }
+              }
+
+              const picked = [...onlineAgents].sort(
+                (a, b) => (loadMap[a.id] ?? 0) - (loadMap[b.id] ?? 0)
+              )[0];
+              if (picked?.id) {
+                convPayload.assigned_agent_id = picked.id;
+              }
+            }
+          } catch (assignErr) {
+            console.warn('Auto-assignment lookup failed:', assignErr);
+          }
+        }
+
         const { data: newConv } = await supabase
           .from('conversations')
           .insert(convPayload)
