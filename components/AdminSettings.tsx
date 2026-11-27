@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Agent, AppSettings, Business } from '@/types';
+import { Agent, AppSettings, Business, CannedResponse } from '@/types';
 import { 
   Settings, 
   Smartphone, 
@@ -21,17 +21,20 @@ import {
   Trash2,
   Pencil,
   Shield,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 
 interface AdminSettingsProps {
   settings: AppSettings;
   agents: Agent[];
   businesses: Business[];
+  cannedResponses?: CannedResponse[];
   currentAgent: Agent;
   onSaveSettings: (newSettings: AppSettings) => void;
   onUpdateAgents: (newAgents: Agent[]) => void;
   onUpdateBusinesses: (newBusinesses: Business[]) => void;
+  onUpdateCannedResponses?: (newCanned: CannedResponse[]) => void;
   onSwitchAgent?: (agent: Agent) => void;
 }
 
@@ -39,10 +42,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   settings,
   agents,
   businesses,
+  cannedResponses = [],
   currentAgent,
   onSaveSettings,
   onUpdateAgents,
   onUpdateBusinesses,
+  onUpdateCannedResponses,
   onSwitchAgent,
 }) => {
   const isAdmin = currentAgent.role === 'admin';
@@ -73,6 +78,14 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   // Add / Edit Business Modal Form
   const [showBizModal, setShowBizModal] = useState(false);
+
+  // Add / Edit Canned Quick Reply Modal Form
+  const [showCannedModal, setShowCannedModal] = useState(false);
+  const [editingCannedId, setEditingCannedId] = useState<string | null>(null);
+  const [cannedShortcut, setCannedShortcut] = useState('');
+  const [cannedTitle, setCannedTitle] = useState('');
+  const [cannedContent, setCannedContent] = useState('');
+  const [isSavingCanned, setIsSavingCanned] = useState(false);
   const [editingBizId, setEditingBizId] = useState<string | null>(null);
   const [newBizName, setNewBizName] = useState('');
   const [newBizPhone, setNewBizPhone] = useState('');
@@ -280,6 +293,75 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         body: JSON.stringify({ agentId, role: nextRole }),
       });
     } catch {}
+  };
+
+  const openAddCannedModal = () => {
+    setEditingCannedId(null);
+    setCannedShortcut('');
+    setCannedTitle('');
+    setCannedContent('');
+    setShowCannedModal(true);
+  };
+
+  const openEditCannedModal = (item: CannedResponse) => {
+    setEditingCannedId(item.id);
+    setCannedShortcut(item.shortcut);
+    setCannedTitle(item.title);
+    setCannedContent(item.content);
+    setShowCannedModal(true);
+  };
+
+  const handleSaveCanned = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cannedShortcut.trim() || !cannedTitle.trim() || !cannedContent.trim() || isSavingCanned) return;
+
+    setIsSavingCanned(true);
+    try {
+      const isUuid = editingCannedId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingCannedId);
+      const method = isUuid ? 'PATCH' : 'POST';
+      const res = await fetch('/api/canned-responses', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: isUuid ? editingCannedId : undefined,
+          shortcut: cannedShortcut,
+          title: cannedTitle,
+          content: cannedContent,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Failed to save quick reply: ${data.error || 'Unknown error'}`);
+        return;
+      }
+
+      if (data.cannedResponse && onUpdateCannedResponses) {
+        if (isUuid) {
+          onUpdateCannedResponses(
+            cannedResponses.map((c) => (c.id === editingCannedId ? data.cannedResponse : c))
+          );
+        } else {
+          const base = cannedResponses.filter((c) => !c.id.startsWith('c-') || c.id !== editingCannedId);
+          onUpdateCannedResponses([...base, data.cannedResponse]);
+        }
+      }
+      setShowCannedModal(false);
+    } catch (err: any) {
+      alert(`Error saving quick reply: ${err.message}`);
+    } finally {
+      setIsSavingCanned(false);
+    }
+  };
+
+  const handleDeleteCanned = async (id: string) => {
+    if (!confirm('Delete this canned quick reply?')) return;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (onUpdateCannedResponses) {
+      onUpdateCannedResponses(cannedResponses.filter((c) => c.id !== id));
+    }
+    if (isUuid) {
+      await fetch(`/api/canned-responses?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+    }
   };
 
   // ACCESS DENIED VIEW FOR REGULAR SUPPORT AGENTS
@@ -632,6 +714,62 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           </div>
         </div>
 
+        {/* Section 4: Canned Quick Replies (/shortcuts) */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Canned Quick Replies ({cannedResponses.length})</h2>
+                <p className="text-xs text-slate-500">Create reusable /shortcut replies that agents can insert in one click</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={openAddCannedModal}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Quick Reply</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {cannedResponses.map((item) => (
+              <div key={item.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-mono font-bold text-[#128C7E]">{item.shortcut}</span>
+                    <span className="text-xs font-bold text-slate-800 ml-1.5">— {item.title}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditCannedModal(item)}
+                      className="text-slate-400 hover:text-indigo-600 p-1 cursor-pointer"
+                      title="Edit Quick Reply"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCanned(item.id)}
+                      className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
+                      title="Delete Quick Reply"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 line-clamp-2">{item.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Dynamic Sticky Save Bar */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
           <div>
@@ -842,6 +980,74 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700"
                 >
                   Save Business
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Canned Quick Reply Modal */}
+      {showCannedModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              <span>{editingCannedId ? 'Edit Canned Quick Reply' : 'Add Canned Quick Reply'}</span>
+            </h3>
+
+            <form onSubmit={handleSaveCanned} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Shortcut *</label>
+                  <input
+                    type="text"
+                    required
+                    value={cannedShortcut}
+                    onChange={(e) => setCannedShortcut(e.target.value)}
+                    placeholder="/shipping"
+                    className="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={cannedTitle}
+                    onChange={(e) => setCannedTitle(e.target.value)}
+                    placeholder="Delivery Info"
+                    className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">Reply Message *</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={cannedContent}
+                  onChange={(e) => setCannedContent(e.target.value)}
+                  placeholder="Orders within Lagos arrive in 24-48 hours..."
+                  className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#128C7E] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCannedModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCanned}
+                  className="px-4 py-1.5 bg-[#128C7E] text-white text-xs font-bold rounded-lg shadow-sm hover:bg-[#075E54] disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingCanned ? 'Saving...' : 'Save Quick Reply'}
                 </button>
               </div>
             </form>

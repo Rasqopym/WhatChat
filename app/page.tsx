@@ -19,7 +19,7 @@ import {
   CANNED_RESPONSES,
   INITIAL_SETTINGS,
 } from '@/lib/mock-data';
-import { Agent, Business, Conversation, Message, InternalNote, AppSettings, MessageMediaType } from '@/types';
+import { Agent, Business, Conversation, Message, InternalNote, AppSettings, MessageMediaType, CannedResponse } from '@/types';
 import { supabase } from '@/lib/supabase';
 import {
   registerServiceWorker,
@@ -67,6 +67,7 @@ export default function WhatsAppMultiAgentApp() {
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_CONVERSATIONS[0].id);
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(MOCK_MESSAGES);
   const [notesMap, setNotesMap] = useState<Record<string, InternalNote[]>>(MOCK_NOTES);
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(CANNED_RESPONSES);
   const [settings, setSettings] = useState<AppSettings>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('whatsapp_app_settings');
@@ -86,10 +87,16 @@ export default function WhatsAppMultiAgentApp() {
 
     const initAuth = async () => {
       try {
-        const [{ data: sessionData }, agentsRes] = await Promise.all([
+        const [{ data: sessionData }, agentsRes, cannedRes] = await Promise.all([
           supabase.auth.getSession(),
           fetch('/api/agents', { cache: 'no-store' }),
+          fetch('/api/canned-responses', { cache: 'no-store' }),
         ]);
+
+        const cannedJson = await cannedRes.json().catch(() => ({ cannedResponses: [] }));
+        if (cannedJson.cannedResponses && cannedJson.cannedResponses.length > 0) {
+          setCannedResponses(cannedJson.cannedResponses);
+        }
 
         const agentsJson = await agentsRes.json().catch(() => ({ agents: [] }));
         const realAgents: Agent[] = agentsJson.agents || [];
@@ -622,7 +629,7 @@ export default function WhatsAppMultiAgentApp() {
               business={selectedConvBusiness}
               messages={currentMessages}
               currentAgent={currentAgent}
-              cannedResponses={CANNED_RESPONSES}
+              cannedResponses={cannedResponses}
               onSendMessage={handleSendMessage}
               onDraftWithAI={handleDraftWithAI}
               onStatusChange={handleStatusChange}
@@ -698,10 +705,12 @@ export default function WhatsAppMultiAgentApp() {
           settings={settings}
           agents={agents}
           businesses={businesses}
+          cannedResponses={cannedResponses}
           currentAgent={currentAgent}
           onSaveSettings={setSettings}
           onUpdateAgents={setAgents}
           onUpdateBusinesses={setBusinesses}
+          onUpdateCannedResponses={setCannedResponses}
           onSwitchAgent={(agent) => setCurrentAgent(agent)}
         />
       )}
