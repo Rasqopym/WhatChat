@@ -31,6 +31,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__whatchatInstallPrompt=e;});`,
+          }}
+        />
+      </head>
       <body className="h-[100dvh] w-screen overflow-hidden bg-slate-100 antialiased">{children}</body>
     </html>
   );

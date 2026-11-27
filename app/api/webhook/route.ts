@@ -381,38 +381,49 @@ export async function POST(req: NextRequest) {
               .select('*')
               .eq('conversation_id', conversation.id)
               .order('created_at', { ascending: true })
-              .limit(10);
+              .limit(15);
 
-            const { reply, shouldHandoff } = await generateAutoReply({
-              latestMessage: messageText,
-              history: (recentMsgs || []) as any[],
-              contactName: customerName,
-              businessName: resolvedBusiness?.name,
-              businessContext: resolvedBusiness?.ai_context,
-              welcomeFallback: activeSettings.autoReplyMessage || undefined,
-            });
+            const hasHumanAgentReplied = (recentMsgs || []).some(
+              (m: any) => m.sender_type === 'agent'
+            );
+            const hasBotAlreadyReplied = (recentMsgs || []).some(
+              (m: any) => m.sender_type === 'bot'
+            );
 
-            if (reply) {
-              const sendRes = await sendWhatsAppTextMessage(
-                fromPhone,
-                reply,
-                resolvedBusiness?.whatsapp_phone_number_id || incomingPhoneNumberId,
-                resolvedBusiness?.whatsapp_access_token
-              );
-
-              await supabase.from('messages').insert({
-                conversation_id: conversation.id,
-                sender_type: 'bot',
-                text: reply,
-                status: sendRes.simulated ? 'delivered' : 'sent',
-                whatsapp_message_id: sendRes.messageId || null,
+            // Do not interrupt if a human agent is already chatting in this thread,
+            // and if Gemini is unavailable, only send the generic welcome greeting once.
+            if (!hasHumanAgentReplied) {
+              const { reply, shouldHandoff, isFallback } = await generateAutoReply({
+                latestMessage: messageText,
+                history: (recentMsgs || []) as any[],
+                contactName: customerName,
+                businessName: resolvedBusiness?.name,
+                businessContext: resolvedBusiness?.ai_context,
+                welcomeFallback: activeSettings.autoReplyMessage || undefined,
               });
 
-              if (shouldHandoff) {
-                await supabase
-                  .from('conversations')
-                  .update({ priority: 'urgent', last_message_text: reply })
-                  .eq('id', conversation.id);
+              if (reply && !(isFallback && hasBotAlreadyReplied)) {
+                const sendRes = await sendWhatsAppTextMessage(
+                  fromPhone,
+                  reply,
+                  resolvedBusiness?.whatsapp_phone_number_id || incomingPhoneNumberId,
+                  resolvedBusiness?.whatsapp_access_token
+                );
+
+                await supabase.from('messages').insert({
+                  conversation_id: conversation.id,
+                  sender_type: 'bot',
+                  text: reply,
+                  status: sendRes.simulated ? 'delivered' : 'sent',
+                  whatsapp_message_id: sendRes.messageId || null,
+                });
+
+                if (shouldHandoff) {
+                  await supabase
+                    .from('conversations')
+                    .update({ priority: 'urgent', last_message_text: reply })
+                    .eq('id', conversation.id);
+                }
               }
             }
           } catch (botErr) {

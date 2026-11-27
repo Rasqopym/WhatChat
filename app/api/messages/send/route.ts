@@ -121,13 +121,18 @@ export async function POST(req: NextRequest) {
       ? `Document: ${media.name}` 
       : text;
 
+    const convUpdate: Record<string, any> = {
+      last_message_text: snippet,
+      last_message_at: new Date().toISOString(),
+      unread_count: 0,
+    };
+    if (!conversation.assigned_agent_id && validSenderId) {
+      convUpdate.assigned_agent_id = validSenderId;
+    }
+
     await supabase
       .from('conversations')
-      .update({
-        last_message_text: snippet,
-        last_message_at: new Date().toISOString(),
-        unread_count: 0,
-      })
+      .update(convUpdate)
       .eq('id', conversationId);
 
     return NextResponse.json({ success: true, simulated: sendResult.simulated, message });

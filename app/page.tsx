@@ -421,7 +421,13 @@ export default function WhatsAppMultiAgentApp() {
           replyTo,
         }),
       });
-      const result = await res.json();
+      const rawText = await res.text();
+      let result: any = {};
+      try {
+        result = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        result = { error: rawText.slice(0, 140) || `HTTP ${res.status}` };
+      }
       if (!res.ok) {
         alert(`Failed to send WhatsApp message: ${result.error || 'Unknown error'}`);
       } else {

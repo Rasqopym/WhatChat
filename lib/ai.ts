@@ -138,7 +138,7 @@ export async function generateAutoReply(params: {
   businessName?: string;
   businessContext?: string;
   welcomeFallback?: string;
-}): Promise<{ reply: string; shouldHandoff: boolean }> {
+}): Promise<{ reply: string; shouldHandoff: boolean; isFallback?: boolean }> {
   const lower = params.latestMessage.toLowerCase();
 
   // Explicit human handoff triggers
@@ -189,5 +189,5 @@ Rules:
     params.welcomeFallback ||
     `Hello ${params.contactName || 'there'}! Thanks for messaging ${params.businessName || 'us'}. Our team has received your message and a specialist will be with you shortly. (Reply "agent" anytime to escalate immediately.)`;
 
-  return { reply: fallbackReply, shouldHandoff: false };
+  return { reply: fallbackReply, shouldHandoff: false, isFallback: true };
 }

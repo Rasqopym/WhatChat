@@ -163,24 +163,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   }
 
-  // Helper to convert File to base64 + convert WebP/unsupported images to JPEG for WhatsApp API
+  // Helper to convert File to base64 + auto-compress large images to stay under Vercel's 4.5MB limit
   const prepareFileForWhatsApp = (file: File, type: MessageMediaType): Promise<{ base64: string; mimeType: string; dataUrl: string; filename: string }> => {
     return new Promise((resolve, reject) => {
+      if (type !== 'image' && file.size > 3 * 1024 * 1024) {
+        reject(new Error('File is too large (max 3 MB for direct upload).'));
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
         const rawDataUrl = reader.result as string;
-        if (type === 'image' && file.type !== 'image/jpeg' && file.type !== 'image/png') {
+        const needsCompress =
+          type === 'image' &&
+          (file.type !== 'image/jpeg' && file.type !== 'image/png' || file.size > 1.5 * 1024 * 1024);
+
+        if (needsCompress) {
           const img = new Image();
           img.onload = () => {
+            const maxDim = 1600;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              const ratio = Math.min(maxDim / width, maxDim / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
             const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
+            canvas.width = width;
+            canvas.height = height;
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0);
-              const jpegUrl = canvas.toDataURL('image/jpeg', 0.88);
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+              const jpegUrl = canvas.toDataURL('image/jpeg', 0.82);
               resolve({
                 base64: jpegUrl.split(',')[1],
                 mimeType: 'image/jpeg',

@@ -30,12 +30,37 @@ export const InstallPwaBanner: React.FC = () => {
       setIsIosPrompt(true);
     }
 
+    // Pick up prompt if Chrome fired beforeinstallprompt before React mounted
+    const preCaptured = (window as any).__whatchatInstallPrompt as BeforeInstallPromptEvent | undefined;
+    if (preCaptured) {
+      setDeferredPrompt(preCaptured);
+    }
+
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
+      (window as any).__whatchatInstallPrompt = e;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    const handleOpenInstall = () => {
+    const handleOpenInstall = async () => {
+      const promptEvent =
+        ((window as any).__whatchatInstallPrompt as BeforeInstallPromptEvent | undefined) ||
+        deferredPrompt;
+
+      if (promptEvent) {
+        try {
+          await promptEvent.prompt();
+          const choice = await promptEvent.userChoice;
+          if (choice.outcome === 'accepted') {
+            (window as any).__whatchatInstallPrompt = undefined;
+            setDeferredPrompt(null);
+            setShowModal(false);
+          }
+          return;
+        } catch {
+          // Fallback to instruction modal if prompt cannot be shown
+        }
+      }
       setShowModal(true);
     };
 
