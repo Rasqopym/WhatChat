@@ -51,7 +51,13 @@ export default function WhatsAppMultiAgentApp() {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('all');
 
   // Navigation & Mobile Responsive State
-  const [activeView, setActiveView] = useState<ActiveView>('inbox');
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('whatchat_active_view') as ActiveView | null;
+      if (saved && ['inbox', 'dashboard', 'broadcasts', 'settings'].includes(saved)) return saved;
+    }
+    return 'inbox';
+  });
   const [mobileShowChat, setMobileShowChat] = useState<boolean>(false);
   const [mobileShowDetails, setMobileShowDetails] = useState<boolean>(false);
   const [templateModalMode, setTemplateModalMode] = useState<'new_chat' | 'reply_template' | null>(null);
@@ -64,7 +70,12 @@ export default function WhatsAppMultiAgentApp() {
 
   // Inbox & Real-time State
   const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
-  const [selectedId, setSelectedId] = useState<string | null>(MOCK_CONVERSATIONS[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('whatchat_selected_conv_id') || MOCK_CONVERSATIONS[0].id;
+    }
+    return MOCK_CONVERSATIONS[0].id;
+  });
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(MOCK_MESSAGES);
   const [notesMap, setNotesMap] = useState<Record<string, InternalNote[]>>(MOCK_NOTES);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(CANNED_RESPONSES);
@@ -164,6 +175,19 @@ export default function WhatsAppMultiAgentApp() {
   const currentMessages = selectedId ? messagesMap[selectedId] || [] : [];
   const currentNotes = selectedId ? notesMap[selectedId] || [] : [];
   const totalUnreadCount = conversations.reduce((acc, c) => acc + c.unread_count, 0);
+
+  // Persist activeView & selectedId across page reloads
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('whatchat_active_view', activeView);
+    }
+  }, [activeView]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && selectedId && !selectedId.startsWith('conv-')) {
+      localStorage.setItem('whatchat_selected_conv_id', selectedId);
+    }
+  }, [selectedId]);
 
   // Update Browser Tab Title with Unread Count
   useEffect(() => {
@@ -272,6 +296,17 @@ export default function WhatsAppMultiAgentApp() {
           const liveIds = new Set(data.conversations.map((c: Conversation) => c.id));
           const remainingMocks = MOCK_CONVERSATIONS.filter((m) => !liveIds.has(m.id));
           return [...data.conversations, ...remainingMocks];
+        });
+        setSelectedId((prev) => {
+          const savedId =
+            typeof window !== 'undefined' ? localStorage.getItem('whatchat_selected_conv_id') : null;
+          if (savedId && data.conversations.some((c: Conversation) => c.id === savedId)) {
+            return savedId;
+          }
+          if ((!prev || prev.startsWith('conv-')) && data.conversations.length > 0) {
+            return data.conversations[0].id;
+          }
+          return prev;
         });
         setMessagesMap(liveMsgMap);
         setNotesMap(liveNotesMap);
