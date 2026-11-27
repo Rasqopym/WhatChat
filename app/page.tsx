@@ -397,19 +397,51 @@ export default function WhatsAppMultiAgentApp() {
     }
   };
 
-  // 1b. Forward a Message to another Conversation
+  // 1b. Forward a Message (Text or Media) to another Conversation
   const handleForwardMessage = async (targetConvId: string, msg: Message) => {
-    const rawBody = msg.text?.replace(/^> Replying to: "[^"]*"\n/, '') || msg.media_name || 'Forwarded attachment';
-    const forwardedText = `Forwarded: ${rawBody}`;
+    const rawBody = msg.text?.replace(/^> Replying to: "[^"]*"\n/, '') || '';
+    const forwardedText = rawBody ? `Forwarded: ${rawBody}` : '';
+
+    let mediaPayload:
+      | { type: MessageMediaType; url: string; name?: string; base64?: string; mimeType?: string }
+      | undefined;
+
+    if (msg.media_type && msg.media_type !== 'text' && msg.media_url) {
+      try {
+        const mediaRes = await fetch(msg.media_url);
+        if (mediaRes.ok) {
+          const blob = await mediaRes.blob();
+          const mimeType = blob.type || (msg.media_type === 'image' ? 'image/jpeg' : msg.media_type === 'video' ? 'video/mp4' : msg.media_type === 'audio' ? 'audio/ogg' : 'application/pdf');
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          if (base64) {
+            mediaPayload = {
+              type: msg.media_type,
+              url: msg.media_url,
+              name: msg.media_name || `forwarded.${mimeType.split('/')[1]?.split(';')[0] || 'bin'}`,
+              base64,
+              mimeType,
+            };
+          }
+        }
+      } catch {
+        // Fallback to forwarding text description if media fetch fails
+      }
+    }
 
     const res = await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId: targetConvId,
-        text: forwardedText,
+        text: forwardedText || (mediaPayload ? '' : `Forwarded: ${msg.media_name || 'Attachment'}`),
         agentId: currentAgent.id,
         agentName: currentAgent.name,
+        media: mediaPayload,
       }),
     });
     const result = await res.json();
