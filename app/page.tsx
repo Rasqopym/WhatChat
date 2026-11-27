@@ -14,9 +14,6 @@ import { InstallPwaBanner } from '@/components/InstallPwaBanner';
 import {
   MOCK_AGENTS,
   MOCK_BUSINESSES,
-  MOCK_CONVERSATIONS,
-  MOCK_MESSAGES,
-  MOCK_NOTES,
   CANNED_RESPONSES,
   INITIAL_SETTINGS,
 } from '@/lib/mock-data';
@@ -70,15 +67,15 @@ export default function WhatsAppMultiAgentApp() {
   const slaAlertedIdsRef = useRef<Set<string>>(new Set());
 
   // Inbox & Real-time State
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('whatchat_selected_conv_id') || MOCK_CONVERSATIONS[0].id;
+      return localStorage.getItem('whatchat_selected_conv_id');
     }
-    return MOCK_CONVERSATIONS[0].id;
+    return null;
   });
-  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(MOCK_MESSAGES);
-  const [notesMap, setNotesMap] = useState<Record<string, InternalNote[]>>(MOCK_NOTES);
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
+  const [notesMap, setNotesMap] = useState<Record<string, InternalNote[]>>({});
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(CANNED_RESPONSES);
   const [settings, setSettings] = useState<AppSettings>(() => {
     if (typeof window !== 'undefined') {
@@ -243,7 +240,7 @@ export default function WhatsAppMultiAgentApp() {
       }
 
       if (data.conversations && data.conversations.length > 0) {
-        const liveMsgMap: Record<string, Message[]> = { ...MOCK_MESSAGES };
+        const liveMsgMap: Record<string, Message[]> = {};
         const incomingNewCustomerMsgs: Message[] = [];
 
         (data.messages || []).forEach((m: Message) => {
@@ -282,7 +279,7 @@ export default function WhatsAppMultiAgentApp() {
         }
 
         // Group notes by conversation_id
-        const liveNotesMap: Record<string, InternalNote[]> = { ...MOCK_NOTES };
+        const liveNotesMap: Record<string, InternalNote[]> = {};
         (data.notes || []).forEach((n: InternalNote) => {
           if (!liveNotesMap[n.conversation_id]) {
             liveNotesMap[n.conversation_id] = [];
@@ -292,12 +289,7 @@ export default function WhatsAppMultiAgentApp() {
           }
         });
 
-        // Merge live conversations at the top, followed by mock conversations
-        setConversations(() => {
-          const liveIds = new Set(data.conversations.map((c: Conversation) => c.id));
-          const remainingMocks = MOCK_CONVERSATIONS.filter((m) => !liveIds.has(m.id));
-          return [...data.conversations, ...remainingMocks];
-        });
+        setConversations(data.conversations);
         setSelectedId((prev) => {
           const savedId =
             typeof window !== 'undefined' ? localStorage.getItem('whatchat_selected_conv_id') : null;
